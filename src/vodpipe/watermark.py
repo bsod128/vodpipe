@@ -3,7 +3,7 @@
 Everything here is a pure string builder. That matters for the claim this module
 exists to support: a watermark should cost nothing, which is only true when its
 filters run **inside the same encode pass** as the scale. A separate watermark
-pass re-decodes and re-encodes the whole asset - measured at +97.1% wall time
+pass re-decodes and re-encodes the whole asset - measured at +98.8% wall time
 (see `bench/m3_watermark.json`). So the filters are fragments that `encode`
 appends after `scale`, never a second ffmpeg call.
 

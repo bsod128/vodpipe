@@ -9,7 +9,7 @@ Two questions the pipeline has to answer with numbers rather than opinions:
    workers on 2160p). Chunking is a multi-GPU tool.
 2. **Watermark overhead matrix** (`watermark_overhead`): what does content
    protection cost? Fused into the encode pass: nothing measurable. As a separate
-   pass: +97.1% wall and another generation of loss.
+   pass: +98.8% wall and another generation of loss.
 
 Both compare against a baseline row on the *same rung*, which is the only
 comparison that means anything: a speedup measured against a different rung or a
@@ -164,7 +164,7 @@ def watermark_overhead(src: probe.Source, rung: Rung, work: str,
     """Wall time and VMAF delta per watermark variant, averaged over `reps`.
 
     Repetition is not decoration: the spread between two runs of the *baseline*
-    (9.68 s and 9.45 s measured here) is the same size as the effect being
+    (9.50 s and 9.34 s measured here) is the same size as the effect being
     claimed, so a single run would have "proven" a 2% speedup from watermarking.
     """
     run = runner or ff.Runner()

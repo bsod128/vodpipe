@@ -25,7 +25,7 @@ answers contradicted what I had read on the internet:
 |---|---|
 | NVENC is ~10x faster than x264 | **1.3-1.7x** on these rungs. At 2160p NVENC is only 0.82x realtime |
 | Split the file, encode in parallel, get a speedup | On one GPU it is **strictly worse**: 2160p 29.8 s whole, 35.3 s at 8x8 |
-| Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free** (within noise, +-2%). A separate pass costs **+97.1%** |
+| Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free** (+0.5..1.9%, inside the baseline's own 1.7% run-to-run spread). A separate pass costs **+98.8%** |
 
 The reason parallel chunking fails is that the NVENC block is a fixed unit on the
 card: one 4K encode already saturates it, so N processes only add contention plus
@@ -122,16 +122,19 @@ Same rung (1080p), same encoder, each variant repeated twice:
 
 | Mode | wall, s | overhead | VMAF mean | VMAF min | kbps |
 |---|---|---|---|---|---|
-| none (baseline) | 9.56 | - | 82.16 | 80.82 | 6909 |
-| static corner logo | 9.63 | **+0.7%** | 82.17 | 80.98 | 6916 |
-| drifting per-viewer id | 9.37 | **-2.0%** | 81.92 | 80.57 | 6949 |
-| + near-invisible second layer | 9.45 | **-1.2%** | 81.93 | 80.41 | 6922 |
-| separate watermark pass | 18.84 | **+97.1%** | 81.83 | 80.52 | 7308 |
+| none (baseline) | 9.42 | - | 82.16 | 80.82 | 6909 |
+| static corner logo | 9.52 | **+1.1%** | 82.17 | 80.98 | 6916 |
+| drifting per-viewer id | 9.47 | **+0.5%** | 81.92 | 80.57 | 6949 |
+| + near-invisible second layer | 9.60 | **+1.9%** | 81.93 | 80.41 | 6922 |
+| separate watermark pass | 18.73 | **+98.8%** | 81.83 | 80.52 | 7308 |
 
-The first four are inside noise - the baseline itself measured 9.68 s and 9.45 s
-across two runs, which is why every variant is repeated. Fused filters ride the
-decode that the encode already performs, so they are close to free. A second
-pass decodes and re-encodes the whole asset, so it doubles the cost.
+The baseline itself measured 9.50 s and 9.34 s across two runs - a 1.7% spread -
+so every variant is repeated and averaged, and the first four differences sit
+inside that spread: a fused watermark is not measurably slower than no
+watermark. Fused filters ride the decode the encode already performs. A second
+pass decodes and re-encodes the whole asset, so it doubles the cost, and it adds
+a generation of quality loss (VMAF -0.33 against the source, on top of what the
+first pass already took).
 
 The dynamic mark drifts in position and alpha as a function of `t`, so there is
 no fixed pixel region to crop or box-blur out; the ghost layer runs at a

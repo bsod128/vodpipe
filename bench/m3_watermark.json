@@ -2,18 +2,15 @@
   "meta": {
     "ffmpeg": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
     "source": "3840x2160@30.0 h264+aac, 24.00 s, 217704 kbps, IDR: 8",
-    "rung": "1080p",
-    "encoder": "h264_nvenc",
-    "reps": 2,
     "gpu": {
       "codec": "h264_nvenc",
       "cards": [
         {
           "index": 4,
           "name": "NVIDIA GeForce RTX 3060",
-          "used": 2438,
+          "used": 2408,
           "total": 12288,
-          "util": 2,
+          "util": 36,
           "nvenc": true,
           "reason": "ok"
         },
@@ -22,27 +19,27 @@
           "name": "Tesla V100-SXM2-16GB",
           "used": 16055,
           "total": 16384,
-          "util": 47,
+          "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 0000021e853379c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000021e853379c0] No capable device"
+          "reason": "[h264_nvenc @ 00000212f15378c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000212f15378c0] No capable device"
         },
         {
           "index": 2,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16099,
+          "used": 16103,
           "total": 16384,
-          "util": 96,
+          "util": 98,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001ce72c379c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001ce72c379c0] No capable device"
+          "reason": "[h264_nvenc @ 0000021885c678c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000021885c678c0] No capable device"
         },
         {
           "index": 1,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16109,
+          "used": 16111,
           "total": 16384,
-          "util": 95,
+          "util": 28,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 00000109e53c79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000109e53c79c0] No capable device"
+          "reason": "[h264_nvenc @ 0000013ff1dd78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000013ff1dd78c0] No capable device"
         },
         {
           "index": 0,
@@ -51,26 +48,30 @@
           "total": 16384,
           "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001f62cdb79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001f62cdb79c0] No capable device"
+          "reason": "[h264_nvenc @ 000001e9b0c578c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001e9b0c578c0] No capable device"
         }
       ],
       "picked": 4
-    }
+    },
+    "rung": "1080p",
+    "encoder": "h264_nvenc",
+    "reps": 2
   },
   "rows": [
     {
       "tag": "none",
       "two_pass": false,
       "rung": "1080p",
-      "wall_s": 9.56,
-      "speed_x": 2.51,
+      "encoder": "h264_nvenc",
+      "wall_s": 9.42,
+      "speed_x": 2.548,
       "size": 20726248,
       "kbps": 6909,
       "vmaf_mean": 82.16,
       "vmaf_min": 80.82,
       "reps": [
-        9.68,
-        9.45
+        9.5,
+        9.34
       ],
       "overhead_pct": 0.0,
       "vmaf_drop": 0.0
@@ -79,68 +80,72 @@
       "tag": "static",
       "two_pass": false,
       "rung": "1080p",
-      "wall_s": 9.63,
-      "speed_x": 2.492,
+      "encoder": "h264_nvenc",
+      "wall_s": 9.52,
+      "speed_x": 2.521,
       "size": 20747116,
       "kbps": 6916,
       "vmaf_mean": 82.17,
       "vmaf_min": 80.98,
       "reps": [
-        9.51,
-        9.76
+        9.57,
+        9.46
       ],
-      "overhead_pct": 0.7,
+      "overhead_pct": 1.1,
       "vmaf_drop": -0.01
     },
     {
       "tag": "dyn",
       "two_pass": false,
       "rung": "1080p",
-      "wall_s": 9.37,
-      "speed_x": 2.561,
+      "encoder": "h264_nvenc",
+      "wall_s": 9.47,
+      "speed_x": 2.534,
       "size": 20847696,
       "kbps": 6949,
       "vmaf_mean": 81.92,
       "vmaf_min": 80.57,
       "reps": [
-        9.3,
-        9.44
+        9.43,
+        9.51
       ],
-      "overhead_pct": -2.0,
+      "overhead_pct": 0.5,
       "vmaf_drop": 0.24
     },
     {
       "tag": "dyn_ghost",
       "two_pass": false,
       "rung": "1080p",
-      "wall_s": 9.45,
-      "speed_x": 2.54,
+      "encoder": "h264_nvenc",
+      "wall_s": 9.6,
+      "speed_x": 2.5,
       "size": 20767420,
       "kbps": 6922,
       "vmaf_mean": 81.93,
       "vmaf_min": 80.41,
       "reps": [
-        9.46,
-        9.43
+        9.53,
+        9.67
       ],
-      "overhead_pct": -1.2,
+      "overhead_pct": 1.9,
       "vmaf_drop": 0.23
     },
     {
       "tag": "twopass",
       "two_pass": true,
       "rung": "1080p",
-      "wall_s": 18.84,
-      "speed_x": 1.274,
+      "encoder": "h264_nvenc",
+      "wall_s": 18.73,
+      "speed_x": 1.281,
       "size": 21924936,
       "kbps": 7308,
       "vmaf_mean": 81.83,
       "vmaf_min": 80.52,
       "reps": [
-        19.29,
-        18.38
+        18.62,
+        18.85
       ],
-      "overhead_pct": 97.1,
+      "overhead_pct": 98.8,
       "vmaf_drop": 0.33
     }
   ]

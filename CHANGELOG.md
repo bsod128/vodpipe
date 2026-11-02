@@ -38,6 +38,6 @@ artifact.
 - NVENC vs x264-medium: only 1.3-1.7x on this GPU, not the 10x folklore.
 - Chunking on one GPU is strictly worse (2160p: 29.8 s whole, 35.3 s at 8x8) -
   the GPU is already saturated by one encode.
-- Fused watermark: within measurement noise (+0.7% static, -2.0% dynamic).
-- Two-pass encode: +97.1% wall.
+- Fused watermark: within measurement noise (+0.5% to +1.9%, against a baseline spread of 1.7%).
+- Two-pass encode: +98.8% wall.
 - Cancel at `encode 1/3`: status CANCELLED with the two finished rungs kept.
