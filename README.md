@@ -25,7 +25,7 @@ answers contradicted what I had read on the internet:
 |---|---|
 | NVENC is ~10x faster than x264 | **1.3-1.7x** on these rungs. At 2160p NVENC is only 0.82x realtime |
 | Split the file, encode in parallel, get a speedup | On one GPU it is **strictly worse**: 2160p 29.8 s whole, 35.3 s at 8x8 |
-| Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free** (+0.5..1.9%, inside the baseline's own 1.7% run-to-run spread). A separate pass costs **+98.8%** |
+| Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free**: every variant lands inside the baseline's own 2.9% run-to-run spread. A separate pass costs **+103.9%** |
 
 The reason parallel chunking fails is that the NVENC block is a fixed unit on the
 card: one 4K encode already saturates it, so N processes only add contention plus
@@ -122,19 +122,19 @@ Same rung (1080p), same encoder, each variant repeated twice:
 
 | Mode | wall, s | overhead | VMAF mean | VMAF min | kbps |
 |---|---|---|---|---|---|
-| none (baseline) | 9.42 | - | 82.16 | 80.82 | 6909 |
-| static corner logo | 9.52 | **+1.1%** | 82.17 | 80.98 | 6916 |
-| drifting per-viewer id | 9.47 | **+0.5%** | 81.92 | 80.57 | 6949 |
-| + near-invisible second layer | 9.60 | **+1.9%** | 81.93 | 80.41 | 6922 |
-| separate watermark pass | 18.73 | **+98.8%** | 81.83 | 80.52 | 7308 |
+| none (baseline) | 9.23 | - | 82.16 | 80.82 | 6909 |
+| static corner logo | 9.16 | **-0.8%** | 82.17 | 80.98 | 6916 |
+| drifting per-viewer id | 9.13 | **-1.1%** | 81.92 | 80.57 | 6949 |
+| + near-invisible second layer | 9.07 | **-1.7%** | 81.93 | 80.41 | 6922 |
+| separate watermark pass | 18.82 | **+103.9%** | 81.85 | 80.76 | 7080 |
 
-The baseline itself measured 9.50 s and 9.34 s across two runs - a 1.7% spread -
-so every variant is repeated and averaged, and the first four differences sit
-inside that spread: a fused watermark is not measurably slower than no
-watermark. Fused filters ride the decode the encode already performs. A second
-pass decodes and re-encodes the whole asset, so it doubles the cost, and it adds
-a generation of quality loss (VMAF -0.33 against the source, on top of what the
-first pass already took).
+The baseline itself measured 9.37 s and 9.10 s across two runs - a 2.9% spread -
+so every variant is repeated and averaged, and every fused variant lands inside
+that spread. The negative overheads are that noise, not a speedup: a fused
+watermark is not measurably slower than no watermark. Fused filters ride the
+decode the encode already performs. A second pass decodes and re-encodes the
+whole asset, so it doubles the cost, and it adds a generation of quality loss
+(VMAF -0.31 against the source, on top of what the first pass already took).
 
 The dynamic mark drifts in position and alpha as a function of `t`, so there is
 no fixed pixel region to crop or box-blur out; the ghost layer runs at a
@@ -182,13 +182,16 @@ Two things had to be understood rather than guessed:
 **Pure core, imperative shell.** Every stage is split into a function that builds
 the argv (no process, no GPU, unit-testable) and a runner that executes it:
 `whole_args()` / `transcode_whole()`, `hls_args()` / `package_hls()`,
-`vmaf_args()` / `vmaf()`. `ff.Runner(execute=..., on_start=...)` is the only
-place a subprocess is created, so tests pass a fake and the worker can attach a
-cancel check without touching the pipeline.
+`vmaf_args()` / `vmaf()`. `ff.Runner(execute=..., timeout_s=..., env=...)` is the
+only place a subprocess is created: tests substitute a fake `execute` that records
+argv without running anything, and a bounded probe passes its own `timeout_s`.
 
-That split is what makes 123 tests runnable on a GPU-less CI runner: the parts
+That split is what makes the suite runnable on a GPU-less CI runner: the parts
 that decide *what* to run are tested directly, the parts that run them carry the
-`ffmpeg` / `gpu` markers and skip.
+`ffmpeg` / `gpu` markers and skip. The one exception is deliberate - a single
+`ffmpeg`-marked test feeds a filtergraph-injection payload to the real binary,
+because a unit test cannot prove that ffmpeg's *parser* agrees with our escaping,
+and that assumption is exactly what used to be wrong.
 
 | Module | Responsibility |
 |---|---|
@@ -199,7 +202,7 @@ that decide *what* to run are tested directly, the parts that run them carry the
 | `encode.py` | whole-file and chunked encode, parallel workers |
 | `ts.py` | concat, and the packet-count integrity proof |
 | `packager.py` | CMAF HLS + DASH in one pass, manifest parsing |
-| `metrics.py` | VMAF (upscale methodology), SSIM/PSNR, bitrate |
+| `metrics.py` | VMAF (upscale methodology), measured bitrate |
 | `watermark.py` | filter fragments and the escaping they need |
 | `gpu.py` | card discovery and an actual NVENC probe per card |
 | `pipeline.py` | orchestration, progress and cancellation hooks |
@@ -279,7 +282,7 @@ session already saturates a card.
 ## Tests, lint, CI
 
 ```bash
-pytest -q                 # 126 tests; ffmpeg/gpu marked tests skip without hardware
+pytest -q                 # 171 tests; ffmpeg/gpu marked tests skip without hardware
 ruff check src tests
 mypy
 ```

@@ -37,7 +37,6 @@ jobs:
 
       - name: Type check
         run: mypy
-        continue-on-error: true
 
       - name: Test
         env:
