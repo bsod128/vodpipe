@@ -250,7 +250,8 @@ Bugs the tests caught, worth naming because they were silent:
 VMAF compares the **distorted rendition upscaled to the reference size** against
 the full reference. Comparing a 1080p rung against a 1080p slice of the source
 measures mostly the scaler. `n_threads=8` matters as much: libvmaf defaults to
-one thread (~1.8 fps on 4K), and with 8 threads it ran at ~13.7 fps. A metric
+one thread (~1.8 fps on 4K), and with 8 threads it ran at 13-14 fps across the rungs
+(13.55 fps for 2160p). A metric
 slower than the encode is a metric nobody runs on a catalogue.
 
 Harmonic mean is the number quoted for a ladder because it punishes the bad
