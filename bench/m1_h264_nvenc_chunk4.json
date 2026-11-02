@@ -6,7 +6,7 @@
       4,
       2
     ],
-    "source": "3840x2160@30.0 h264+aac, 4.00 с, 337570 кбит/с, IDR: 2",
+    "source": "3840x2160@30.0 h264+aac, 4.00 s, 337570 kbps, IDR: 2",
     "source_path": "work/smoke.mp4",
     "duration": 4.0,
     "gpu": {

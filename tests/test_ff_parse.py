@@ -87,11 +87,15 @@ def test_last_speed_is_zero_when_ffmpeg_printed_no_stats():
 
 def test_clean_path_uses_forward_slashes():
     """ffmpeg's arg and filtergraph parsers treat backslash as an escape char."""
-    assert ff.clean_path(r"T:\resume\media\out\master.m3u8") == "T:/resume/media/out/master.m3u8"
+    assert ff.clean_path(r"D:\media\out\master.m3u8") == "D:/media/out/master.m3u8"
 
 
 def test_scrub_hides_machine_specific_roots():
-    text = "source not found: T:\\resume\\media\\src_clip\\master.mp4"
+    """Reported error text is committed and shown to clients, so the host's
+    directory layout must not survive it."""
+    text = "source not found: D:\\media\\src_clip\\master.mp4"
     assert ff.scrub(text) == "source not found: <local-path>"
     assert ff.scrub("see /home/user/media/out.m3u8") == "see <local-path>"
-    assert "resume" not in ff.scrub(text)
+    assert ff.scrub("see ~/media/out.m3u8") == "see <local-path>"
+    assert "src_clip" not in ff.scrub(text)
+    assert ff.scrub("relative/out.m3u8") == "relative/out.m3u8"

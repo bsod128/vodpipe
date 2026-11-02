@@ -93,12 +93,12 @@ def test_labels_are_sanitized_for_file_names():
 
 
 def test_windows_paths_are_forward_slashed_in_argv():
-    rungs = [("1080p", "T:\\resume\\media\\work\\x.ts")]
-    args = packager.hls_args(rungs, "T:\\resume\\media\\out")
+    rungs = [("1080p", "D:\\media\\work\\x.ts")]
+    args = packager.hls_args(rungs, "D:\\media\\out")
     # args[0] is the resolved ffmpeg binary; that one may be a native path.
     joined = " ".join(args[1:])
     assert "\\" not in joined, "backslashes are escape chars to ffmpeg's parsers"
-    assert "T:/resume/media/out/stream_%v.m3u8" in joined
+    assert "D:/media/out/stream_%v.m3u8" in joined
 
 
 # ------------------------------------------------------------ manifest read

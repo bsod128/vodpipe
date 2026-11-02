@@ -330,7 +330,13 @@ def clean_path(path) -> str:
 LOCAL_PATH = "<" + "local-path" + ">"
 
 _DRIVE = re.compile(r"[A-Za-z]:[\\/][^\s\"',;)\]}]*")
-_UNIX = re.compile(r"(?<![\w/])(~?[\\/](?:home|mnt|srv|opt|Users)[\\/][^\s\"',;)\]}]*)")
+# `~/anything`, or an absolute path under a known filesystem root. Deliberately
+# not "any leading slash": a repo-relative `./out/x.m3u8` is meaningful to the
+# reader and must survive.
+_UNIX = re.compile(r"(?<![\w/])("
+                   r"~[\\/][^\s\"',;)\]}]*"
+                   r"|/(?:home|mnt|srv|opt|Users|var|usr|etc|root)[\\/][^\s\"',;)\]}]*"
+                   r")")
 
 
 def scrub(text: str) -> str:
