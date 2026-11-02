@@ -1,0 +1,85 @@
+# Инфраструктура vodpipe.
+#
+#   rabbitmq  - broker очереди задач
+#   redis     - result backend + прогресс/отмена
+#   api       - FastAPI (приём задач, прогресс, Range-раздача CMAF)
+#   worker    - Celery + ffmpeg; запускается только когда Docker реально видит GPU
+#
+# На этой машине Docker Desktop не пробрасывает GPU внутрь своей WSL2-виртуалки
+# (nvidia-container-cli: "nvml error: unknown error", cuInit -> CUDA_ERROR_NO_DEVICE),
+# поэтому NVENC-воркер поднят на хосте отдельной командой, а сервис worker вынесен
+# в профиль gpu:
+#   python api/tasks.py                # хостовый воркер, очередь localhost:5672
+#   docker compose --profile gpu up    # воркер в контейнере (Linux, driver >= 580)
+name: vodpipe
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./api/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - rabbit-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      VODPIPE_MEDIA: /media
+      VODPIPE_BROKER: amqp://guest:guest@rabbitmq:5672/
+      VODPIPE_BACKEND: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src_clip:/media/src_clip:ro
+      - ./out:/media/out
+      - ./work:/media/work
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    profiles: ["gpu"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["celery", "-A", "tasks", "worker", "-l", "info", "-Q", "celery", "-c", "1"]
+    environment:
+      VODPIPE_MEDIA: /media
+      VODPIPE_BROKER: amqp://guest:guest@rabbitmq:5672/
+      VODPIPE_BACKEND: redis://redis:6379/0
+      VODPIPE_FFMPEG: /usr/local/bin/ffmpeg
+    volumes:
+      - ./src_clip:/media/src_clip:ro
+      - ./out:/media/out
+      - ./work:/media/work
+    gpus: all
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  rabbit-data:

@@ -1,0 +1,29 @@
+# --- local artifacts / large binaries ---
+bin/*.exe
+src_clip/
+work/
+out/
+*.mp4
+*.m4s
+*.m3u8
+*.mpd
+*.ts
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# --- os/editor ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# --- local env ---
+.env

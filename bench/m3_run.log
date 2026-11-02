@@ -1,0 +1,21 @@
+﻿ffmpeg: ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers
+  GPU 4 NVIDIA GeForce RTX 3060    free= 9850MiB util=  2% NVENC OK
+  GPU 3 Tesla V100-SXM2-16GB       free=  329MiB util= 47% NVENC ���  <- [h264_nvenc @ 0000021e853379c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_int
+  GPU 2 Tesla V100-SXM2-16GB       free=  285MiB util= 96% NVENC ���  <- [h264_nvenc @ 000001ce72c379c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_int
+  GPU 1 Tesla V100-SXM2-16GB       free=  275MiB util= 95% NVENC ���  <- [h264_nvenc @ 00000109e53c79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_int
+  GPU 0 Tesla V100-SXM2-16GB       free=  225MiB util=  0% NVENC ���  <- [h264_nvenc @ 000001f62cdb79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_int
+  CUDA_VISIBLE_DEVICES=4
+source: 3840x2160@30.0 h264+aac, 24.00 �, 217704 ����/�, IDR: 8
+  none       wall=   9.56s speed= 2.51x vmaf= 82.16 kbps=  6909
+  static     wall=   9.63s speed=2.492x vmaf= 82.17 kbps=  6916
+  dyn        wall=   9.37s speed=2.561x vmaf= 81.92 kbps=  6949
+  dyn_ghost  wall=   9.45s speed= 2.54x vmaf= 81.93 kbps=  6922
+  twopass    wall=  18.84s speed=1.274x vmaf= 81.83 kbps=  7308
+
+overhead � ������� ���������:
+  none       +  0.0% wall   VMAF -  0.0   6909 kbps
+  static     +  0.7% wall   VMAF --0.01   6916 kbps
+  dyn        + -2.0% wall   VMAF - 0.24   6949 kbps
+  dyn_ghost  + -1.2% wall   VMAF - 0.23   6922 kbps
+  twopass    + 97.1% wall   VMAF - 0.33   7308 kbps
+report -> T:\resume\media\bench\m3_watermark.json
