@@ -1,5 +1,5 @@
-"""Quality metrics: VMAF (what streaming services tune ladders with) plus
-SSIM/PSNR as cheap sanity checks.
+"""Quality metrics: VMAF (what streaming services tune ladders with) and the
+bitrate a rung actually achieved.
 
 The methodology note is the whole point of this module. Comparing a 1080p rung
 against a 1080p slice of the source measures mostly the *scaling*, not the
@@ -14,14 +14,14 @@ Two practical traps:
   `n_threads=8` it ran at ~13.7 fps (measured, 7.5x). A metric slower than the
   encode is a metric nobody runs on a catalogue.
 * the option is `log_fmt`, not `log_format`, and the JSON aggregates live under
-  `pooled_metrics.vmaf` (older builds: `pooled.VMAF`). Parsing guesses either.
+  `pooled_metrics.vmaf` (older builds: `pooled.VMAF`). Parsing guesses either,
+  and recomputes any aggregate the pooled block omitted.
 """
 
 from __future__ import annotations
 
 import json
 import os
-import re
 
 from . import ff
 
@@ -85,13 +85,24 @@ def parse_vmaf_json(probe: dict) -> dict:
     vals = [f["metrics"]["vmaf"] for f in frames
             if "vmaf" in f.get("metrics", {}) and f["metrics"]["vmaf"] is not None]
 
+    # Every aggregate is recomputed from the per-frame values when the pooled
+    # block is missing, and the basis is recorded (same idea as `bitrate_source`
+    # below). Reading `harmonic_mean or 0.0` verbatim used to report a real
+    # ladder as "0.00" whenever a build omitted the pooled block, which reads
+    # like a measurement rather than a gap.
     mean = pooled.get("mean") or (sum(vals) / len(vals) if vals else 0.0)
+    harmonic = pooled.get("harmonic_mean")
+    basis = "pooled"
+    if not harmonic and vals:
+        harmonic = len(vals) / sum(1.0 / max(v, 1e-9) for v in vals)
+        basis = "recomputed"
     return {
         "vmaf_mean": round(float(mean), 2),
-        "vmaf_harmonic": round(float(pooled.get("harmonic_mean") or 0.0), 2),
+        "vmaf_harmonic": round(float(harmonic or 0.0), 2),
         "vmaf_min": round(min(vals), 2) if vals else 0.0,
         "vmaf_p99": round(percentile(vals, 0.99), 2) if vals else 0.0,
         "frames": len(frames),
+        "vmaf_basis": basis,
     }
 
 
@@ -115,32 +126,6 @@ def vmaf(ref: str, dist: str, log_json: str, threads: int | None = None,
         parsed = parse_vmaf_json(json.load(f))
     parsed["wall_s"] = round(res.wall_s, 2)
     return parsed
-
-
-# --------------------------------------------------------------------------
-# ssim / psnr: no model, no file, cheap
-# --------------------------------------------------------------------------
-
-_SSIM_RE = re.compile(r"All:([0-9.]+)")
-_PSNR_RE = re.compile(r"average ([0-9.]+) dB")
-
-
-def ssim_psnr_args(ref: str, dist: str, name: str) -> list[str]:
-    return [ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "info",
-            "-i", dist, "-i", ref, "-lavfi", f"[0:v][1:v]{name}", "-f", "null", "-"]
-
-
-def ssim_psnr(ref: str, dist: str, runner: ff.Runner | None = None) -> dict:
-    """ssim/psnr print their summary to **stderr** - there is no log file."""
-    run = runner or ff.Runner()
-    out: dict = {}
-    for name, regex, key in (("ssim", _SSIM_RE, "ssim"), ("psnr", _PSNR_RE, "psnr_db")):
-        res = run.run(ssim_psnr_args(ref, dist, name), check=False)
-        m = regex.search(res.stderr or "")
-        if m:
-            out[key] = float(m.group(1))
-        out[f"{name}_wall_s"] = round(res.wall_s, 2)
-    return out
 
 
 def bitrate_args(path: str) -> list[str]:
@@ -189,7 +174,11 @@ def parse_bitrate_probe(probe: dict) -> dict:
 def bitrate(path: str, runner: ff.Runner | None = None) -> dict:
     """Bitrate actually achieved. Compared against the ladder target this is how
     you find a rung whose rate control drifted."""
-    probe = ff.probe_json(path, [
-        "stream=codec_type,codec_name,bit_rate,width,height:format=bit_rate,duration"
-    ], runner=runner)
+    # Runs the argv `bitrate_args()` owns, so the probe that produces the number
+    # and the probe pinned by the tests can never drift apart.
+    res = (runner or ff.Runner()).run(bitrate_args(path))
+    try:
+        probe = json.loads(res.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        raise ff.FFError(bitrate_args(path), f"invalid ffprobe json: {exc}", 0) from exc
     return parse_bitrate_probe(probe)

@@ -1,16 +1,31 @@
-"""Watermark filter fragments.
+r"""Watermark filter fragments.
 
 Everything here is a pure string builder. That matters for the claim this module
 exists to support: a watermark should cost nothing, which is only true when its
 filters run **inside the same encode pass** as the scale. A separate watermark
-pass re-decodes and re-encodes the whole asset - measured at +98.8% wall time
+pass re-decodes and re-encodes the whole asset - measured at +103.9% wall time
 (see `bench/m3_watermark.json`). So the filters are fragments that `encode`
 appends after `scale`, never a second ffmpeg call.
 
-Escaping is the part that silently breaks: `drawtext` option values live inside a
-filtergraph string where `:` separates options, `,` separates filters and `[`/`]`
-name pads. A subscriber ID containing a colon would otherwise be parsed as an
-option boundary. `escape()` handles it, and a test pins it down.
+Escaping is the part that silently breaks. In a `-vf` chain `,` separates
+filters, `;` separates chains and `:` separates options, so an unescaped value
+can turn into extra filters. The rule below was measured against ffmpeg 7.1, not
+taken from documentation: each value was drawn three ways - `text=`, `textfile=`
+(which reads the bytes verbatim and is therefore the ground truth), and a
+payload trying to append a filter - and the rendered frames were compared.
+
+Quoting **and** backslash-escaping the metacharacters is the spelling that
+parses, renders identically to `textfile=`, and cannot splice. Each half alone
+fails: an escaped quote inside a quoted region is not an escape (a backslash is
+literal there), so the quote closes the value and the payload becomes filters;
+and quoting without escaping leaves the colons to the option parser, so a
+Windows font path and any `id:99` overlay stop parsing at all. The shell idiom
+`'\''` is therefore wrong for a filtergraph.
+
+Two things follow. A payload that would splice now fails closed (ffmpeg refuses
+to parse it) instead of running, and the API allow-list refuses such text before
+it reaches a command line. drawtext cannot render a literal apostrophe in any
+spelling, which is why `'` is not in the allow-list.
 
 This is a *visible/semi-visible* mark, i.e. session identification, not a
 forensic watermark: it does not survive a re-encode of the picture. Real forensic
@@ -21,8 +36,6 @@ from __future__ import annotations
 
 import os
 import re
-
-from . import ff
 
 # Default fonts resolved per-OS; overridable so a Linux container can run too.
 _FONT_CANDIDATES = (
@@ -39,20 +52,29 @@ def font(bold: bool = False) -> str:
              _FONT_CANDIDATES[3], _FONT_CANDIDATES[2]) if bold else _FONT_CANDIDATES
     for path in order:
         if os.path.exists(path):
-            return f"fontfile='{escape(path)}'"
+            return f"fontfile={escape(path)}"
     return ""
 
 
-def escape(value: str) -> str:
-    """Escape a value used inside a filtergraph option.
+#: Characters that end or reshape a filtergraph value: `,` separates filters,
+#: `;` separates filterchains, `[]` wrap pad links, `=` splits an option from
+#: its name, `:` splits options inside one filter, and `'` opens/closes a quoted
+#: region. A backslash is the escape character itself.
+_GRAPH_SPECIALS = "\\:[]',;="
 
-    Order matters: backslash first, otherwise the backslashes this function
-    introduces get escaped again.
+
+def escape(value: str) -> str:
+    """Quote and escape one value inside a filtergraph option.
+
+    Both halves are required, and each was checked against a real ffmpeg rather
+    than assumed: quoting alone leaves a bare `'` able to close the value and
+    splice filters onto the encode, and backslash-escaping alone leaves an
+    unquoted value unable to contain a colon at all (a Windows font path such as
+    `C:/Windows/Fonts/...` does not even parse). Escaping is done character by
+    character, so a backslash in the input is escaped exactly once.
     """
-    out = value.replace("\\", "\\\\")
-    for ch in (":", "'", "[", "]"):
-        out = out.replace(ch, "\\" + ch)
-    return out
+    return "'" + "".join("\\" + c if c in _GRAPH_SPECIALS else c
+                         for c in value) + "'"
 
 
 def _comma(expr: str) -> str:
@@ -103,7 +125,7 @@ def _drawtext(text: str, *, size: int, font: str, color: str, x: str, y: str,
     if font:
         parts.append(font)
     parts += [
-        f"text='{escape(text)}'", f"fontsize={size}", f"fontcolor={color}",
+        f"text={escape(text)}", f"fontsize={size}", f"fontcolor={color}",
         f"x={x}", f"y={y}",
     ]
     if borderw:
@@ -136,8 +158,8 @@ def from_spec(spec: dict | None) -> str:
     """
     if not spec:
         return ""
-    static = spec.get("static") or spec.get("logo_text")
-    dynamic = spec.get("dynamic") or spec.get("viewer_id")
+    static = spec.get("static")
+    dynamic = spec.get("dynamic")
     ghost = spec.get("ghost")
     if ghost is True:
         ghost = dynamic_ghost(str(dynamic or static or "vod"))
@@ -148,37 +170,18 @@ def from_spec(spec: dict | None) -> str:
     )
 
 
-SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_.:@#-]{1,64}$")
+#: Watermark text allow-list. Space is included on purpose (a rights-holder
+#: overlay is e.g. "MAXIMA VOD"); every graph metacharacter (quote, comma,
+#: colon-as-option-boundary when unquoted, brackets) is excluded, so this list
+#: is what lets the API accept a spec without reasoning about escaping.
+SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_.:@# -]{1,64}$")
 
 
 def is_safe_id(value: str) -> bool:
     """Watermark text ends up inside a filtergraph, so it is untrusted input.
 
-    Even though `escape()` neutralises graph metacharacters, an allow-list keeps
-    a client from smuggling an arbitrarily long or exotic expression into the
-    encoder command line.
+    `escape()` keeps the graph parseable; this allow-list is the second line of
+    defence the API enforces, so a client cannot push an arbitrarily long or
+    exotic expression into the encoder command line.
     """
     return bool(SAFE_ID_RE.fullmatch(value or ""))
-
-
-def make_logo_args(path: str, text: str = "VODPIPE", w: int = 460, h: int = 120) -> list[str]:
-    """argv that renders a PNG logo with lavfi - so the repo ships no binary assets."""
-    return [
-        ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
-        "-f", "lavfi", "-i", f"color=c=black@0.0:s={w}x{h}:d=0.04",
-        "-vf", chain(
-            "format=rgba",
-            "drawbox=x=0:y=0:w=iw:h=ih:color=white@0.10:t=fill",
-            "drawbox=x=0:y=ih-4:w=iw:h=4:color=0xE53946@0.9:t=fill",
-            _drawtext(text, size=44, font=font(True), color="white@0.9",
-                      x="(w-text_w)/2", y="(h-text_h)/2-4"),
-        ),
-        "-frames:v", "1", path,
-    ]
-
-
-def make_logo(path: str, text: str = "VODPIPE", w: int = 460, h: int = 120,
-              runner: ff.Runner | None = None) -> str:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    (runner or ff.Runner()).run(make_logo_args(path, text, w, h))
-    return path

@@ -18,16 +18,19 @@ See `bench/m2_bench.json` for the curve.
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
-from . import ff, watermark
+from . import ff, ts, watermark
+from . import probe as probe_mod
 from .encoders import Encoder, gop_args, rate_args
 from .ladder import Rung
 from .probe import Source
 
-_BASE = ["-hide_banner", "-loglevel", "info", "-stats"]
+#: ffmpeg logging flags shared by every encode path (whole, chunked, bench).
+BASE_ARGS = ["-hide_banner", "-loglevel", "info", "-stats"]
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,21 @@ class VideoFilter:
                                "setsar=1", self.wm or None)
 
 
+def out_fps(src: Source, rung: Rung) -> int:
+    """Frame rate the encode will actually produce: source fps, capped by the rung.
+
+    Getting this wrong is expensive twice over. Forcing the rung ceiling (30) on
+    a 24 fps master resamples the picture, so the frame-count integrity check
+    compares a 30 fps output against a 24 fps expectation and reports a false
+    failure; and libvmaf pairs frames by index, so a rate mismatch between the
+    rendition and the reference silently misaligns every frame instead of
+    failing. A master is produced at a fixed rate in this pipeline, so encode and
+    master agree and the two sides of every comparison stay on the same basis.
+    """
+    fps = round(src.fps) if src.fps else rung.max_fps
+    return max(1, min(fps, rung.max_fps))
+
+
 def audio_args(rung: Rung) -> list[str]:
     """AAC per rung. Audio is re-encoded rather than copied so that every rung
     has the same sample rate and channel layout; a ladder whose audio differs
@@ -66,10 +84,10 @@ def _output_args(rung: Rung, out_path: str) -> list[str]:
 def whole_args(src: Source, rung: Rung, enc: Encoder, out_path: str, wm: str = "") -> list[str]:
     vf = VideoFilter(rung, src, wm).build()
     return [
-        ff.ffmpeg(), "-y", *_BASE,
+        ff.ffmpeg(), "-y", *BASE_ARGS,
         "-i", src.path,
         "-vf", vf,
-        *gop_args(rung.max_fps),
+        *gop_args(out_fps(src, rung)),
         *enc.args(),
         *rate_args(rung),
         *_output_args(rung, out_path),
@@ -83,6 +101,7 @@ def transcode_whole(src: Source, rung: Rung, enc: Encoder, out_path: str, wm: st
     return {
         "mode": "whole", "rung": rung.label, "encoder": enc.name,
         "speed_x": round(res.speed_x, 3), "wall_s": round(res.wall_s, 2),
+        "out_fps": out_fps(src, rung),
         "out": out_path, "size": os.path.getsize(out_path),
     }
 
@@ -91,14 +110,14 @@ def chunk_args(src: Source, rung: Rung, enc: Encoder, start: float, duration: fl
                out_path: str, wm: str = "") -> list[str]:
     vf = VideoFilter(rung, src, wm).build()
     return [
-        ff.ffmpeg(), "-y", *_BASE,
+        ff.ffmpeg(), "-y", *BASE_ARGS,
         # -ss BEFORE -i is a fast seek that lands on an IDR: accurate and cheap.
         # -ss AFTER -i decodes everything up to the cut (accurate but slow) and is
         # the wrong choice here because we already chose IDR boundaries.
         "-ss", str(start), "-t", str(round(duration, 4)),
         "-i", src.path,
         "-vf", vf,
-        *gop_args(rung.max_fps),
+        *gop_args(out_fps(src, rung)),
         *enc.args(),
         *rate_args(rung),
         *_output_args(rung, out_path),
@@ -128,9 +147,6 @@ def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
     When agg_speed_x rises while wall_s also rises, parallelism is buying
     utilisation, not latency - which is exactly what one GPU does.
     """
-    from . import probe as probe_mod
-    from . import ts
-
     os.makedirs(chunk_dir, exist_ok=True)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
@@ -138,8 +154,6 @@ def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
     paths = [os.path.join(chunk_dir, f"c{i:03d}.ts") for i in range(len(bounds))]
 
     run = runner or ff.Runner()
-    import time
-
     t0 = time.perf_counter()
     stats: list[dict] = []
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(bounds)))) as pool:
@@ -167,6 +181,7 @@ def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
         "wall_s": round(total, 2),
         "speed_x": round(src.duration / total, 3),
         "agg_speed_x": round(sum(s["speed_x"] for s in stats) / max(len(stats), 1), 3),
+        "out_fps": out_fps(src, rung),
         "out": out_path, "size": os.path.getsize(out_path),
         "chunks": stats,
     }

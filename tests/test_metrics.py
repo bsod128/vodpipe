@@ -26,6 +26,23 @@ def test_vmaf_falls_back_to_per_frame_when_no_pooled_block():
     assert out["vmaf_min"] == 55.5
 
 
+def test_harmonic_is_recomputed_not_zeroed_when_the_pooled_block_omits_it():
+    """A committed artifact once reported vmaf_harmonic 0.00 for a whole ladder
+    because the pooled block had no harmonic_mean. A zero reads like a
+    measurement; recomputing and labelling the basis is honest."""
+    out = metrics.parse_vmaf_json({
+        "pooled_metrics": {"vmaf": {"mean": 81.83}},   # mean only, no harmonic
+        "frames": [{"metrics": {"vmaf": 90.0}}, {"metrics": {"vmaf": 60.0}}],
+    })
+    assert out["vmaf_harmonic"] == round(2 / (1 / 90.0 + 1 / 60.0), 2)  # 72.0
+    assert out["vmaf_basis"] == "recomputed"
+
+
+def test_basis_labels_where_the_aggregates_came_from():
+    assert metrics.parse_vmaf_json(VMAF_LOG)["vmaf_basis"] == "pooled"
+    assert metrics.parse_vmaf_json({"frames": VMAF_LOG["frames"]})["vmaf_basis"] == "recomputed"
+
+
 def test_vmaf_ignores_null_frame_values():
     out = metrics.parse_vmaf_json({"frames": [{"metrics": {"vmaf": None}}]})
     assert out["vmaf_mean"] == 0.0

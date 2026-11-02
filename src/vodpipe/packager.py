@@ -103,7 +103,11 @@ def dash_args(rungs: list[tuple[str, str]], dash_dir: str, seg_dur: float = 4.0)
     args += input_args(rungs) + map_args(len(rungs))
     args += [
         "-c", "copy",
-        "-bsf:a", "aac_adtstoasc",
+        # Same gate as the HLS path: the ADTS->ASC filter is needed for AAC that
+        # arrives inside MPEG-TS. HLS and DASH consume the *same* TS rungs, so
+        # they must agree on this precondition (it once did not, which the HLS
+        # test caught and the DASH side silently did not).
+        *bsf_args(rungs),
         "-f", "dash",
         "-seg_duration", str(seg_dur),
         # template + timeline: one URL template with a segment timeline instead

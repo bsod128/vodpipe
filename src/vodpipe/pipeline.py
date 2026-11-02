@@ -16,7 +16,6 @@ Design points that are easy to get wrong:
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import time
@@ -104,12 +103,16 @@ class Pipeline:
         Container duration on a concatenated TS is not trustworthy (per-chunk PCR
         restart), so the check is the video packet count. See vodpipe.ts.
         """
-        expect = expect_frames or ts.expected_video_frames(self.src.duration,
-                                                           self.src.fps)
         checks = []
         for r in results:
             if r.get("cancelled") or not r.get("out") or r["mode"] != "chunked":
                 continue
+            # The expectation uses the fps that rung was commanded to emit
+            # (`out_fps`), not the source fps: they differ whenever the rung
+            # ceiling resamples the master, and comparing across bases reports
+            # a false frame-count failure.
+            fps = r.get("out_fps") or self.src.fps
+            expect = expect_frames or ts.expected_video_frames(self.src.duration, fps)
             checks.append({"rung": r["rung"],
                            **ts.verify_concat(r["out"], expect, runner=self.runner)})
         return checks
@@ -146,10 +149,3 @@ class Pipeline:
                 print(f"  VMAF {r['rung']:>6} {r['encoder']:<11}: "
                       f"mean={m['vmaf_mean']} harm={m['vmaf_harmonic']} min={m['vmaf_min']}")
         return out
-
-
-def dump(path: str, obj) -> str:
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-    return path

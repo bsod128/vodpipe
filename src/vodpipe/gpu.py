@@ -18,13 +18,16 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 
 from . import ff
 
 _SMI_QUERY = ["nvidia-smi",
               "--query-gpu=index,name,memory.used,memory.total,utilization.gpu",
               "--format=csv,noheader,nounits"]
+
+#: A 1-second test encode plus encoder init. Generous, but bounded: a card that
+#: hangs must not hang the sweep.
+_PROBE_TIMEOUT_S = 30.0
 
 
 def probe_gpu_args(codec: str, index: int) -> list[str]:
@@ -74,12 +77,15 @@ def rank(card: dict) -> tuple:
 
 
 def probe_index(index: int, codec: str = "h264_nvenc") -> tuple[bool, str]:
-    env = dict(os.environ, CUDA_VISIBLE_DEVICES=str(index))
-    proc = subprocess.run(probe_gpu_args(codec, index), capture_output=True,
-                          text=True, errors="replace", env=env)
-    if proc.returncode == 0:
+    # A bounded, single-card test encode. The timeout is what stops one wedged
+    # NVENC call from hanging the whole card sweep (and, in the worker, the
+    # single-slot worker that called it).
+    run = ff.Runner(timeout_s=_PROBE_TIMEOUT_S,
+                    env=dict(os.environ, CUDA_VISIBLE_DEVICES=str(index)))
+    res = run.run(probe_gpu_args(codec, index), check=False)
+    if res.returncode == 0:
         return True, "ok"
-    return False, " ".join((proc.stderr or "").split())[:200]
+    return False, " ".join((res.stderr or "").split())[:200]
 
 
 _CACHE: dict[str, dict] = {}

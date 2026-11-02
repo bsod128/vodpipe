@@ -57,9 +57,19 @@ def find(name: str) -> str:
     """
     env = os.environ.get("VODPIPE_" + name.upper())
     if env:
-        if os.path.exists(env):
-            return env
-        raise FFmpegNotFound(f"VODPIPE_{name.upper()}={env!r} does not exist")
+        separators = [sep for sep in (os.path.sep, os.path.altsep) if sep]
+        if any(sep in env for sep in separators):
+            # Looks like a path: use it exactly, or fail with a clear reason.
+            if os.path.exists(env):
+                return env
+            raise FFmpegNotFound(f"VODPIPE_{name.upper()}={env!r} does not exist")
+        # A bare tool name: resolve through PATH, so `VODPIPE_FFMPEG=ffmpeg`
+        # (what CI sets) works instead of raising.
+        found = shutil.which(env)
+        if found:
+            return found
+        raise FFmpegNotFound(
+            f"VODPIPE_{name.upper()}={env!r} is not on PATH")
 
     for d in _LOCAL_DIRS:
         for cand in (name, name + ".exe"):
@@ -95,21 +105,44 @@ class Runner:
     """
 
     execute: Callable[[list[str]], Any] | None = None
-    """callable(argv) -> CompletedProcess-like; None means subprocess.run."""
+    """callable(argv) -> CompletedProcess-like; None means subprocess.run.
 
-    on_start: Callable[[list[str]], None] | None = None
-    """callable(argv) -> None; used for logging or a cancel check before spawn."""
+    This is the seam tests use (a fake `execute` decides nothing, it only
+    records what was decided) and the seam a worker would use for logging.
+    """
+
+    timeout_s: float | None = None
+    """Wall-clock ceiling for the default executor. None = unbounded.
+
+    A bounded helper (probe, health, GPU check) should set one so a wedged
+    ffmpeg cannot pin a single-slot worker forever. Encode/VMAF runs are left
+    unbounded on purpose: a legitimate 4K pass can be slow, and killing it is
+    worse than the stall it prevents. Note that Celery's own task time limits
+    are only enforced by the prefork pool, not the `-P threads` pool this repo
+    uses on Windows, so this Runner timeout is the real backstop here.
+    """
+
+    env: dict[str, str] | None = None
+    """Child environment override (e.g. CUDA_VISIBLE_DEVICES for a GPU probe).
+
+    Kept here so subprocess creation stays in one place; callers that need a
+    per-process environment no longer call subprocess.run directly.
+    """
 
     def _default_execute(self, argv: list[str]):
-        return subprocess.run(argv, capture_output=True, text=True, errors="replace")
+        return subprocess.run(argv, capture_output=True, text=True,
+                              errors="replace", timeout=self.timeout_s, env=self.env)
 
     def run(self, argv: Sequence[str], check: bool = True) -> Result:
         argv = [str(a) for a in argv]
-        if self.on_start:
-            self.on_start(argv)
         execute = self.execute or self._default_execute
         t0 = time.perf_counter()
-        proc = execute(argv)
+        try:
+            proc = execute(argv)
+        except subprocess.TimeoutExpired as exc:
+            # The default executor has a ceiling; surface it like any other
+            # ffmpeg failure instead of leaking a subprocess module exception.
+            raise FFError(argv, f"timed out after {exc.timeout}s", -1) from exc
         wall = time.perf_counter() - t0
         stdout = getattr(proc, "stdout", "") or ""
         stderr = getattr(proc, "stderr", "") or ""
@@ -189,22 +222,25 @@ def parse_filter_names(dump: str) -> set[str]:
     return set(_FILTER_LINE_RE.findall(dump or ""))
 
 
-def has_encoder(name: str, runner: Runner | None = None) -> bool:
+def encoder_names(runner: Runner | None = None) -> set[str]:
+    """Every encoder this build offers, from one `ffmpeg -encoders` dump."""
     out = (runner or _DEFAULT).run([ffmpeg(), "-hide_banner", "-encoders"]).stdout
-    return name in parse_encoder_names(out)
+    return parse_encoder_names(out)
 
 
-def has_filter(name: str, runner: Runner | None = None) -> bool:
+def filter_names(runner: Runner | None = None) -> set[str]:
+    """Every filter this build offers, from one `ffmpeg -filters` dump."""
     out = (runner or _DEFAULT).run([ffmpeg(), "-hide_banner", "-filters"]).stdout
-    return name in parse_filter_names(out)
+    return parse_filter_names(out)
 
 
 def version(runner: Runner | None = None) -> str:
-    out = (runner or _DEFAULT).run([ffmpeg(), "-hide_banner", "-version"]).stdout
+    out = (runner or _DEFAULT).run(version_args()).stdout
     return out.splitlines()[0] if out.strip() else "unknown"
 
 
 def version_args() -> list[str]:
+    """argv for the version banner. Kept because `version()` runs it."""
     return [ffmpeg(), "-hide_banner", "-version"]
 
 
@@ -294,11 +330,13 @@ class Health:
     filters: dict[str, bool] = field(default_factory=dict)
     detail: str = ""
 
-    def ok_for(self, codec: str) -> bool:
-        return self.encoders.get(codec, False)
 
+#: Filters the pipeline actually runs. Anything here missing is a hard stop, so
+#: the list must track the code, not an aspirational wish list.
+REQUIRED_FILTERS = ("libvmaf", "drawtext", "scale", "setsar")
 
-REQUIRED_FILTERS = ("libvmaf", "drawtext", "scale", "setsar", "overlay", "ssim", "psnr")
+#: Encoders `doctor`/`demo` can fall back between.
+KNOWN_ENCODERS = ("h264_nvenc", "hevc_nvenc", "h264_qsv", "libx264")
 
 
 def health(check_filters: Sequence[str] = REQUIRED_FILTERS) -> Health:
@@ -306,13 +344,12 @@ def health(check_filters: Sequence[str] = REQUIRED_FILTERS) -> Health:
         ver = version()
     except FFmpegNotFound as exc:
         return Health(ffmpeg="missing", version="?", detail=str(exc))
-    enc_names = parse_encoder_names(run([ffmpeg(), "-hide_banner", "-encoders"]).stdout)
-    flt_names = parse_filter_names(run([ffmpeg(), "-hide_banner", "-filters"]).stdout)
+    enc_names = encoder_names()
+    flt_names = filter_names()
     return Health(
         ffmpeg=ffmpeg(),
         version=ver,
-        encoders={c: c in enc_names for c in ("h264_nvenc", "hevc_nvenc", "h264_qsv",
-                                              "libx264")},
+        encoders={c: c in enc_names for c in KNOWN_ENCODERS},
         filters={f: f in flt_names for f in check_filters},
     )
 

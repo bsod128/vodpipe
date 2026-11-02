@@ -114,7 +114,7 @@ def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[f
     long-GOP master), we fall back to a GOP-aligned uniform grid and accept that
     chunks start at non-keyframes: ffmpeg's `-ss` before `-i` still snaps to the
     nearest IDR, which is why the resulting total stays frame-accurate - the
-    frame count check in `vodpipe.concat` is what proves it.
+    frame count check in `vodpipe.ts.verify_concat` is what proves it.
     """
     if n <= 0:
         raise ValueError("n must be positive")

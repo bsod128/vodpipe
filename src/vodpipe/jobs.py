@@ -15,11 +15,11 @@ from __future__ import annotations
 import os
 from urllib.parse import urlsplit, urlunsplit
 
+from .ladder import select as ladder_select
+from .report import RESULT_KEYS
+
 CANCEL_KEY_PREFIX = "vodpipe:cancel:"
 CANCEL_TTL_S = 3600
-
-# Client-visible states. PENDING/RUNNING are non-terminal.
-STATES = ("PENDING", "RUNNING", "SUCCESS", "FAILURE", "CANCELLED")
 
 
 def cancel_key(job_id: str) -> str:
@@ -50,8 +50,7 @@ def snapshot(state: str, info: dict | None) -> dict:
             out["state"] = "CANCELLED"
         out["rungs"] = info.get("rungs")
         out["artifacts"] = info.get("artifacts")
-        out["result"] = {k: info.get(k)
-                        for k in ("total_wall_s", "ladder_wall_s", "gpu")}
+        out["result"] = {k: info.get(k) for k in RESULT_KEYS}
     elif state == "REVOKED":
         # Only reachable if someone revoked outside this codebase; still map it.
         out["state"] = "CANCELLED"
@@ -84,13 +83,11 @@ def rung_subset(labels: list[str] | None, rungs) -> list | None:
 
     Returns None for "use the default ladder" so the caller keeps its own
     default instead of an empty list (an empty ladder silently does nothing).
+    Lenient on purpose: the API already rejected unknown labels in `JobIn`, so
+    by the time a spec reaches the worker an unmatched label is not a client
+    error to surface, and the default ladder is the safe fallback.
     """
-    if not labels:
-        return None
-    wanted = set(labels)
-    picked = [r for r in rungs if r.label in wanted]
-    picked.sort(key=lambda r: r.height, reverse=True)
-    return picked or None
+    return ladder_select(labels, rungs, strict=False) or None
 
 
 def rung_summary(results: list[dict], vmaf: dict | None = None) -> list[dict]:

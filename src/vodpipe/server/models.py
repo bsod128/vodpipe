@@ -7,15 +7,17 @@ before a worker is ever occupied.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Names come from vodpipe.encoders / vodpipe.ladder so the API cannot drift
 # away from what the pipeline actually implements.
-from ..encoders import BACKENDS
-from ..ladder import ladder
+from vodpipe.encoders import BACKENDS, PRESET_DEFAULTS, validate_preset
+from vodpipe.ladder import ladder
+from vodpipe.watermark import is_safe_id
 
 ENCODERS = tuple(sorted(BACKENDS))
 LADDER = tuple(r.label for r in ladder())
+ENCODER_PRESET_HELP = ", ".join(f"{name} -> {p}" for name, p in sorted(PRESET_DEFAULTS.items()))
 
 
 class WatermarkIn(BaseModel):
@@ -23,11 +25,26 @@ class WatermarkIn(BaseModel):
     dynamic: str | None = Field(None, description="Per-session / per-viewer id")
     ghost: bool = Field(False, description="Near-invisible layer, survives cropping")
 
+    @field_validator("static", "dynamic")
+    @classmethod
+    def _watermark_text_is_constrained(cls, value: str | None) -> str | None:
+        """Watermark text is client input that ends up inside a filtergraph.
+
+        `watermark.escape()` is what keeps the graph parseable; this allow-list
+        is the second line of defence, so a client cannot push an arbitrarily
+        long or exotic expression into the encoder command line.
+        """
+        if value is not None and not is_safe_id(value):
+            raise ValueError(
+                "watermark text must be 1-64 characters of A-Za-z0-9 . _ : @ # space -")
+        return value
+
 
 class JobIn(BaseModel):
     source: str | None = Field(None, description="Source path inside the media root")
     encoder: str = Field("h264_nvenc")
-    preset: str = Field("p5", description="p1..p7 for NVENC, x264 preset names for libx264")
+    preset: str | None = Field(
+        None, description=f"Encoder preset; per-backend default ({ENCODER_PRESET_HELP})")
     nchunks: int = Field(1, ge=1, le=64,
                          description="Parallel chunks; >1 only helps across GPUs")
     workers: int = Field(1, ge=1, le=16)
@@ -42,6 +59,17 @@ class JobIn(BaseModel):
         if value not in ENCODERS:
             raise ValueError(f"encoder must be one of: {', '.join(ENCODERS)}")
         return value
+
+    @model_validator(mode="after")
+    def _preset_valid_for_encoder(self) -> JobIn:
+        """A preset valid for one backend can be fatal for another.
+
+        Catching it here returns a 422 instead of accepting a job the worker
+        then fails on after it has been queued (the GPU-absent fallback hit
+        exactly this when a global default of "p5" reached libx264).
+        """
+        self.preset = validate_preset(self.encoder, self.preset)
+        return self
 
     @field_validator("rungs")
     @classmethod

@@ -43,7 +43,9 @@ class JobCancelled(Exception):
     """Raised internally when the cancel flag is set; never reaches the client."""
 
 
-def _state():
+def state_client():
+    """The state/result Redis. Imported lazily so the library imports fine
+    without the optional `server` extra installed."""
     import redis
 
     return redis.Redis.from_url(settings.STATE_URL, decode_responses=True)
@@ -53,7 +55,7 @@ def _check_cancel(job_id: str) -> bool:
     """True if the client asked to cancel. A Redis outage must not fail a job
     that is otherwise fine, so an unreachable backend reads as "no cancel"."""
     try:
-        return bool(_state().exists(cancel_key(job_id)))
+        return bool(state_client().exists(cancel_key(job_id)))
     except Exception:
         return False
 
@@ -88,7 +90,9 @@ def transcode(self, job_id: str, spec: dict) -> dict:
         raise RuntimeError(f"source not found: {src}")
 
     encoder = spec.get("encoder", "h264_nvenc")
-    preset = spec.get("preset", "p5")
+    # No preset default here: `encoders.build` fills the per-backend default.
+    # Hardcoding "p5" (an NVENC preset) was what killed the libx264 fallback.
+    preset = spec.get("preset")
     nchunks = int(spec.get("nchunks", 1))
     workers = int(spec.get("workers", 1))
 
@@ -167,7 +171,7 @@ def transcode(self, job_id: str, spec: dict) -> dict:
         # and leaks the machine layout into every response.
         artifacts = {
             "report": report.to_repo_relative(report_path, settings.MEDIA_ROOT),
-            "report_url": f"/jobs/{job_id}/report",
+            "report_url": report.report_url(job_id),
         }
         if pkg:
             artifacts.update({
@@ -175,7 +179,7 @@ def transcode(self, job_id: str, spec: dict) -> dict:
                     os.path.join(out_dir, "hls", "master.m3u8"), settings.MEDIA_ROOT),
                 "dash_mpd": report.to_repo_relative(
                     os.path.join(out_dir, "dash", "manifest.mpd"), settings.MEDIA_ROOT),
-                "hls_url": f"/media/{job_id}/hls/master.m3u8",
+                "hls_url": report.hls_url(job_id),
                 "hls_variants": pkg["hls"].get("variants"),
                 "segments": pkg["hls"].get("segments"),
             })

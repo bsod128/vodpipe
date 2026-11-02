@@ -9,7 +9,7 @@ Two questions the pipeline has to answer with numbers rather than opinions:
    workers on 2160p). Chunking is a multi-GPU tool.
 2. **Watermark overhead matrix** (`watermark_overhead`): what does content
    protection cost? Fused into the encode pass: nothing measurable. As a separate
-   pass: +98.8% wall and another generation of loss.
+   pass: +103.9% wall and another generation of loss.
 
 Both compare against a baseline row on the *same rung*, which is the only
 comparison that means anything: a speedup measured against a different rung or a
@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 from . import encode, encoders, ff, metrics, probe, ts, watermark
 from .ladder import Rung
+from .ladder import select as ladder_select
 
 # (tag, encoder, mode, nchunks, workers, preset)
 MATRIX = [
@@ -61,13 +62,12 @@ class Selection:
 
 
 def pick_rungs(labels: list[str]) -> list[Rung]:
-    from .ladder import ladder
+    """Rungs for the requested labels, raising on a typo.
 
-    all_rungs = {r.label: r for r in ladder()}
-    chosen = [all_rungs[label] for label in labels if label in all_rungs]
-    if not chosen:
-        raise ValueError(f"no such rung in {sorted(all_rungs)}")
-    return chosen
+    Strict here (unlike the queue path): a benchmark that silently encodes a
+    different rung set than it was asked for produces a table nobody can trust.
+    """
+    return ladder_select(labels, strict=True)
 
 
 def run_matrix(src: probe.Source, work: str, sel: Selection, do_vmaf: bool = False,
@@ -75,12 +75,15 @@ def run_matrix(src: probe.Source, work: str, sel: Selection, do_vmaf: bool = Fal
     run = runner or ff.Runner()
     ref = src.resolution
     rows: list[dict] = []
+    # One `ffmpeg -encoders` dump for the whole matrix, not one per row: the
+    # result is constant for a given binary.
+    available = ff.encoder_names(run)
     for rung in pick_rungs(sel.rungs):
         for tag, enc_name, mode, nchunks, workers, preset in MATRIX:
             if tag not in sel.configs:
                 continue
             enc = encoders.build(enc_name, preset)
-            if enc.hw and not ff.has_encoder(enc.codec):
+            if enc.hw and enc.codec not in available:
                 print(f"  [{rung.label}] {tag}: skipped, {enc.codec} unavailable")
                 continue
 
@@ -92,9 +95,10 @@ def run_matrix(src: probe.Source, work: str, sel: Selection, do_vmaf: bool = Fal
                 r = encode.transcode_chunked(src, rung, enc, out, nchunks, workers,
                                              chunk_dir, runner=run)
                 # Integrity is part of the measurement: a faster encode that
-                # drops frames is not faster, it is wrong.
-                check = ts.verify_concat(out, ts.expected_video_frames(src.duration, src.fps),
-                                         runner=run)
+                # drops frames is not faster, it is wrong. The expectation uses
+                # the fps this encode was commanded to emit, not the source fps.
+                check = ts.verify_concat(
+                    out, ts.expected_video_frames(src.duration, r["out_fps"]), runner=run)
                 r["concat_ok"] = check["ok"]
                 r["vpkts"] = check["vpkts"]
                 import shutil
@@ -138,12 +142,18 @@ def two_pass(src: probe.Source, rung: Rung, enc: encoders.Encoder, out: str, wor
     base = os.path.join(work, "twopass_base.ts")
     first = encode.transcode_whole(src, rung, enc, base, runner=run)
 
+    # The second pass reuses the *same* rate control, GOP and scale filter the
+    # fused path uses (`encode`/`encoders` builders), so the "+~99%" overhead is
+    # the cost of the extra pass itself and not an artefact of a different
+    # encoder configuration. The only intentional difference: audio is copied,
+    # because pass 1 already encoded it.
     chain = watermark.from_spec(wm_spec)
     vf = watermark.chain(rung.scale(src.width, src.height), "setsar=1", chain)
-    argv = [ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "info", "-stats",
-            "-i", base, "-vf", vf, *enc.args(),
-            "-b:v", str(rung.bitrate), "-maxrate:v", str(rung.maxrate),
-            "-bufsize:v", str(rung.bufsize), "-c:a", "copy", "-f", "mpegts", out]
+    argv = [ff.ffmpeg(), "-y", *encode.BASE_ARGS,
+            "-i", base, "-vf", vf,
+            *encoders.gop_args(encode.out_fps(src, rung)),
+            *enc.args(), *encoders.rate_args(rung),
+            "-c:a", "copy", "-f", "mpegts", out]
     t0 = time.perf_counter()
     res = run.run(argv)
     second = time.perf_counter() - t0
@@ -164,7 +174,7 @@ def watermark_overhead(src: probe.Source, rung: Rung, work: str,
     """Wall time and VMAF delta per watermark variant, averaged over `reps`.
 
     Repetition is not decoration: the spread between two runs of the *baseline*
-    (9.50 s and 9.34 s measured here) is the same size as the effect being
+    (9.37 s and 9.10 s measured here) is the same size as the effect being
     claimed, so a single run would have "proven" a 2% speedup from watermarking.
     """
     run = runner or ff.Runner()

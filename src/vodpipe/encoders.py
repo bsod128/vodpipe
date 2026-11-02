@@ -22,6 +22,12 @@ from dataclasses import dataclass, field
 from . import ff
 from .ladder import Rung
 
+#: Shared help-text cache. `ffmpeg -h encoder=<codec>` is a subprocess, and the
+#: benchmark builds many encoders; without one shared cache each `build()` pays
+#: for it again. `ff.ffmpeg()` resolves once per process, so a module-level
+#: instance cannot go stale against a different binary.
+_HELP = ff.EncoderHelp()
+
 
 @dataclass(frozen=True)
 class Encoder:
@@ -68,7 +74,7 @@ def h264_nvenc(preset: str = "p5", help_: ff.EncoderHelp | None = None) -> Encod
     in dark scenes compared with x264, which is exactly the kind of regression a
     benchmark at matched bitrate would otherwise hide.
     """
-    h = help_ or ff.EncoderHelp()
+    h = help_ or _HELP
     codec = "h264_nvenc"
     return Encoder(
         name=codec, codec=codec, tag="avc1", hw=True,
@@ -83,7 +89,7 @@ def h264_nvenc(preset: str = "p5", help_: ff.EncoderHelp | None = None) -> Encod
 
 def hevc_nvenc(preset: str = "p5", help_: ff.EncoderHelp | None = None) -> Encoder:
     """NVENC H.265 - the 4K rung, where H.264 at 4K bitrate stops paying."""
-    h = help_ or ff.EncoderHelp()
+    h = help_ or _HELP
     codec = "hevc_nvenc"
     return Encoder(
         name=codec, codec=codec, tag="hvc1", hw=True,
@@ -115,14 +121,45 @@ BACKENDS = {
     "libx264": libx264,
 }
 
+#: Each backend has its own preset vocabulary. Preset names are NOT portable:
+#: passing the NVENC default "p5" to libx264 is a hard ffmpeg error, so the
+#: default has to be chosen per backend rather than globally.
+PRESET_DEFAULTS = {
+    "h264_nvenc": "p5",
+    "hevc_nvenc": "p5",
+    "h264_qsv": "veryfast",
+    "libx264": "medium",
+}
+
+#: The NVENC family uses p1..p7; everything else uses its own names.
+NVENC_PRESETS = frozenset(f"p{i}" for i in range(1, 8))
+
+
+def is_nvenc(name: str) -> bool:
+    return name in ("h264_nvenc", "hevc_nvenc")
+
+
+def validate_preset(name: str, preset: str | None) -> str:
+    """Return a preset valid for `name`, filling the backend's default for None.
+
+    Rejects the cross-vocabulary mistake that silently breaks the GPU-absent
+    fallback: an NVENC preset handed to libx264 (or vice versa) makes ffmpeg
+    exit non-zero after the job has already been accepted and queued.
+    """
+    if name not in BACKENDS:
+        raise ValueError(f"unknown encoder {name!r}; choose from {sorted(BACKENDS)}")
+    preset = preset or PRESET_DEFAULTS[name]
+    if is_nvenc(name):
+        if preset not in NVENC_PRESETS:
+            raise ValueError(
+                f"{name} preset must be one of {sorted(NVENC_PRESETS)}, got {preset!r}")
+    elif preset in NVENC_PRESETS:
+        raise ValueError(
+            f"{name} does not accept NVENC preset {preset!r}; use an {name} preset")
+    return preset
+
 
 def build(name: str, preset: str | None = None) -> Encoder:
-    try:
-        factory = BACKENDS[name]
-    except KeyError:
-        raise ValueError(f"unknown encoder {name!r}; choose from {sorted(BACKENDS)}") from None
-    import inspect
-
-    if "preset" in inspect.signature(factory).parameters:
-        return factory(preset) if preset else factory()
-    return factory()
+    preset = validate_preset(name, preset)
+    factory = BACKENDS[name]
+    return factory(preset)

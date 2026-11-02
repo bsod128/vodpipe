@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+from conftest import requires_gpu
+
 from vodpipe import gpu
 
 SMI = """4, NVIDIA GeForce RTX 3060, 512, 12288, 3
@@ -75,3 +78,23 @@ def test_summary_names_the_picked_card_and_the_reasons():
 def test_summary_says_so_when_nothing_can_encode():
     text = gpu.summary({"codec": "hevc_nvenc", "picked": None, "cards": []})
     assert "no card can encode" in text
+
+
+@requires_gpu
+def test_probe_returns_a_decision_and_a_reason_on_real_hardware():
+    """Run the actual 1-second encode against every card this machine has.
+
+    The assertion is not "it worked" - on a machine whose only GPU has no NVENC
+    block it must fail - it is that a probe always terminates with a verdict and
+    a human-readable reason. That is the property production depends on: a hung
+    probe is what pins a single-slot worker, and "failed" without a reason is
+    what turns a three-hour debugging session into a guess.
+    """
+    cards = gpu.gpus()
+    if not cards:
+        pytest.skip("no NVIDIA GPU on this machine")
+    for card in cards:
+        ok, reason = gpu.probe_index(card["index"])
+        assert isinstance(ok, bool)
+        assert reason, f"card {card['index']} failed without a reason"
+        assert len(reason) <= 200

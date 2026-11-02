@@ -31,11 +31,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
-def _state():
-    import redis
-
-    return redis.Redis.from_url(settings.STATE_URL, decode_responses=True)
+# The Redis client factory lives with the worker (tasks.state_client); the API
+# reuses it so the connection settings and the lazy import exist once.
+_state = tasks.state_client
 
 
 # --------------------------------------------------------------------- health
@@ -135,6 +133,9 @@ def cancel(job_id: str):
     return _snapshot(job_id)
 
 
+# Route templates are literal by FastAPI's design. The client-facing URLs the
+# worker returns live in `report.report_url`/`report.hls_url`; if you rename a
+# route here, change those too.
 @app.get("/jobs/{job_id}/report")
 def job_report(job_id: str):
     path = os.path.join(settings.WORK_ROOT, job_id, "report.json")

@@ -90,6 +90,30 @@ def ladder(target_heights: list[int] | None = None) -> list[Rung]:
     return sorted(rungs, key=lambda r: -r.height)
 
 
+def select(labels: list[str] | None, rungs: list[Rung] | None = None,
+           strict: bool = True) -> list[Rung]:
+    """Filter a ladder by rung label, keeping the tallest-first order.
+
+    One owner for "subset the ladder", because two copies had drifted apart: the
+    queue path silently dropped an unknown label while the benchmark raised only
+    when *nothing* matched, so `--rungs 1000p` quietly encoded a different set
+    than was asked for. `strict` keeps the queue's lenient contract (it falls
+    back to the default ladder) without re-implementing the selection.
+    """
+    rungs = rungs if rungs is not None else ladder()
+    if not labels:
+        return []
+    wanted = set(labels)
+    picked = sorted((r for r in rungs if r.label in wanted),
+                    key=lambda r: -r.height)
+    if strict:
+        missing = wanted - {r.label for r in picked}
+        if missing:
+            known = ", ".join(sorted(r.label for r in rungs))
+            raise ValueError(f"unknown rung(s) {sorted(missing)}; available: {known}")
+    return picked
+
+
 def validate(rungs: list[Rung]) -> list[str]:
     """Return human-readable ladder problems (empty list == ladder is sane)."""
     problems: list[str] = []

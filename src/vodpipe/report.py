@@ -18,6 +18,22 @@ from . import ff
 REDACTED = ff.LOCAL_PATH  # same placeholder the scrubber writes
 
 
+# Route URLs the API serves. The worker puts these in a job's artifacts and the
+# HTTP layer registers the matching routes; owning them here means the two can
+# only move together. (The report-schema *keys* are fixed by the committed
+# artifacts in bench/, but these are endpoint strings, not schema keys.)
+def report_url(job_id: str) -> str:
+    return f"/jobs/{job_id}/report"
+
+
+def media_url(job_id: str, rest: str) -> str:
+    return f"/media/{job_id}/{rest}"
+
+
+def hls_url(job_id: str) -> str:
+    return media_url(job_id, "hls/master.m3u8")
+
+
 def build_report(job_id: str, meta: dict, encode: list[dict], ladder_wall_s: float,
                  packaging: dict, vmaf: dict, verify: list[dict],
                  total_wall_s: float) -> dict:
@@ -36,6 +52,11 @@ def build_report(job_id: str, meta: dict, encode: list[dict], ladder_wall_s: flo
         "verify": verify,
         "total_wall_s": total_wall_s,
     }
+
+
+#: Keys a finished job's result echoes back to the client. The queue layer reads
+#: them out of the task payload, so they are named once, next to the builder.
+RESULT_KEYS = ("total_wall_s", "ladder_wall_s", "gpu")
 
 
 def _inside_repo(path, root: str) -> str | None:

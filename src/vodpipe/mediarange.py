@@ -46,10 +46,6 @@ class ByteRange:
     def length(self) -> int:
         return self.end - self.start + 1
 
-    @property
-    def is_full(self) -> bool:
-        return self.start == 0 and self.end == self.total - 1
-
     def content_range(self) -> str:
         return f"bytes {self.start}-{self.end}/{self.total}"
 

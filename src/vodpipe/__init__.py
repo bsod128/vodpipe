@@ -9,9 +9,14 @@ The layout follows the "pure core / imperative shell" split:
 Every stage therefore has two halves: `*_args()` (decide) and `*_run()` (do).
 """
 
-from .ladder import Rung, ladder
+# Only `Rung` and `Pipeline` are re-exported. `ladder()` deliberately is *not*:
+# rebinding the name here shadows the `vodpipe.ladder` submodule on the package,
+# so `from vodpipe import ladder` would hand back a function and every
+# `ladder.validate(...)` call would fail with an AttributeError. Import the
+# factory from its module: `from vodpipe.ladder import ladder`.
+from .ladder import Rung
 from .pipeline import Pipeline
 
-__all__ = ["Pipeline", "Rung", "ladder"]
+__all__ = ["Pipeline", "Rung"]
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

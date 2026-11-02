@@ -72,7 +72,7 @@ def normalize_args(ts_path: str, mp4_path: str) -> list[str]:
     return [
         ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "warning",
         # +genpts rebuilds missing PTS, which the seam gaps can leave behind.
-        "-fflags", "+genpts", "-i", _clean(ts_path),
+        "-fflags", "+genpts", "-i", ff.clean_path(ts_path),
         "-c", "copy",
         # AAC inside TS is ADTS; fMP4/MP4 requires AudioSpecificConfig.
         "-bsf:a", "aac_adtstoasc",
@@ -107,8 +107,3 @@ def normalize(ts_path: str, mp4_path: str, expect_dur: float = 0.0,
         "after": after,
         "expected_duration": expect_dur,
     }
-
-
-def _clean(path: str) -> str:
-    """Forward slashes: ffmpeg's parsers treat `\\` in Windows paths as escapes."""
-    return path.replace("\\", "/")
