@@ -153,19 +153,25 @@ Submit a 3-rung ladder and cancel it at `encode 1/3`:
 
 ```
 $ vodpipe job --source src_clip/4k_master.mp4 --rungs 2160p,1440p,1080p --cancel-at 1/3
-job: b3978ecc0e91
-  PENDING p=0.0: queued
+job: fd69c5d723af
   RUNNING p=0.01: gpu-probe
-  RUNNING p=0.21: encode 1/3
+  RUNNING p=0.02: probe
+  RUNNING p=0.233: encode 1/3
   -> cancel at encode 1/3
   CANCELLED p=1.0: cancelled
 ```
 
-Result: status `CANCELLED`, the rungs finished before the cancel (`2160p`,
-`1080p`) kept with their measured bitrates (29 123 and 6 772 kbps), the third
-rung marked `cancelled`, ladder wall 39.19 s, report preserved. A cancelled job
-is not a failed job: its finished output is still usable. Artifact:
+Result: status `CANCELLED`, the rungs finished before the cancel (`2160p` 30.07 s,
+`1440p` 13.99 s) kept with their measured bitrates (29 123 and 11 564 kbps), the
+third rung marked `cancelled`, ladder wall 44.09 s, report preserved. A cancelled
+job is not a failed job: its finished output is still usable. Artifact:
 [`bench/m4_cancelled_report.json`](bench).
+
+A successful run of the same shape - 2 rungs, watermark on, no VMAF - finishes in
+24.2 s from submit to `SUCCESS`, packages HLS and DASH from one CMAF feed (12
+segments), and returns the URLs to read them: artifact
+[`bench/m4_report.json`](bench). Fetching one of its variants with a `Range` header
+comes back `206` with `Accept-Ranges: bytes` and the right `Content-Type`.
 
 Two things had to be understood rather than guessed:
 

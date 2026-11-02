@@ -34,7 +34,8 @@ artifact.
   sample: reproducible, and no licensing question about the source.
 
 ### Measured
-- Ladder of 5 rungs on 4K: 82.6 s wall, VMAF 94.88 (2160p) to 59.63 (432p).
+- Ladder of 5 rungs on 4K: 82.6 s wall chunked (63.4 s whole-file), VMAF 94.88 (2160p)
+  to 59.63 (432p) on the chunked run.
 - NVENC vs x264-medium: only 1.3-1.7x on this GPU, not the 10x folklore.
 - Chunking on one GPU is strictly worse (2160p: 29.8 s whole, 35.3 s at 8x8) -
   the GPU is already saturated by one encode.
@@ -109,6 +110,11 @@ code, duplication, or suggestions deliberately declined (noted at the bottom).
 ### Changed
 - `mypy` is a real CI gate now (it ran with `continue-on-error`, so a type
   break was invisible).
+- The queue E2E was re-run against the hardened code: `bench/m4_cancelled_report.json`
+  is that run (job `fd69c5d723af` - CANCELLED, two finished rungs, ladder 44.09 s),
+  and `bench/m4_report.json` is a successful one of the same shape (job `f0fbbb61404f`
+  - 2 rungs with a watermark, 24.24 s submit-to-SUCCESS, HLS and DASH from one CMAF
+  feed). Previously only the cancelled case had a committed artifact.
 
 ### Review suggestions deliberately declined
 - Path traversal on `/media/{job_id}/{rest}` and `/jobs/{job_id}/report`: probed
