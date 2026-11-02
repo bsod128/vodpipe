@@ -1,0 +1,13 @@
+# Text files are stored with LF in the repository and checked out as-is, so
+# diffs and the committed JSON artifacts stay identical on every platform.
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.ps1 text eol=crlf
+Dockerfile text eol=lf
+
+# Never treat these as text: they are binary or generated payload.
+*.mp4 binary
+*.m4s binary
+*.ts binary
+*.exe binary

@@ -1,26 +1,33 @@
-# Инфраструктура vodpipe.
+# vodpipe infrastructure.
 #
-#   rabbitmq  - broker очереди задач
-#   redis     - result backend + прогресс/отмена
-#   api       - FastAPI (приём задач, прогресс, Range-раздача CMAF)
-#   worker    - Celery + ffmpeg; запускается только когда Docker реально видит GPU
+#   rabbitmq  - job queue broker
+#   redis     - result backend, progress and cancel flags
+#   api       - FastAPI (job intake, progress, range delivery of the CMAF output)
+#   worker    - Celery + ffmpeg; started only when Docker can really see a GPU
 #
-# На этой машине Docker Desktop не пробрасывает GPU внутрь своей WSL2-виртуалки
-# (nvidia-container-cli: "nvml error: unknown error", cuInit -> CUDA_ERROR_NO_DEVICE),
-# поэтому NVENC-воркер поднят на хосте отдельной командой, а сервис worker вынесен
-# в профиль gpu:
-#   python api/tasks.py                # хостовый воркер, очередь localhost:5672
-#   docker compose --profile gpu up    # воркер в контейнере (Linux, driver >= 580)
+# This machine's Docker Desktop cannot pass a GPU into its WSL2 VM
+# (nvidia-container-cli: "nvml error: unknown error", cuInit ->
+# CUDA_ERROR_NO_DEVICE), so the NVENC worker is started on the host with
+#   python -m vodpipe.server.tasks
+# and the containerized worker sits in the `gpu` profile:
+#   docker compose --profile gpu up
 name: vodpipe
 
 services:
   rabbitmq:
     image: rabbitmq:4-management
+    # `guest` only accepts loopback connections, and the api container connects
+    # from another network namespace -> 403 ACCESS_REFUSED. A named account is
+    # created on first start. Credentials come from the environment; the
+    # defaults are development-only, override them anywhere real.
+    environment:
+      RABBITMQ_DEFAULT_USER: ${VODPIPE_RABBIT_USER:-vodpipe}
+      RABBITMQ_DEFAULT_PASS: ${VODPIPE_RABBIT_PASS:-vodpipe-dev}
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
-      - ./api/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./config/rabbitmq.conf:/etc/rabbitmq/conf.d/10-defaults.conf:ro
       - rabbit-data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
@@ -45,7 +52,7 @@ services:
       dockerfile: Dockerfile
     environment:
       VODPIPE_MEDIA: /media
-      VODPIPE_BROKER: amqp://guest:guest@rabbitmq:5672/
+      VODPIPE_BROKER: amqp://${VODPIPE_RABBIT_USER:-vodpipe}:${VODPIPE_RABBIT_PASS:-vodpipe-dev}@rabbitmq:5672/
       VODPIPE_BACKEND: redis://redis:6379/0
     ports:
       - "8000:8000"
@@ -64,12 +71,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["celery", "-A", "tasks", "worker", "-l", "info", "-Q", "celery", "-c", "1"]
+    # ffmpeg comes from the base image install below; on a GPU host the worker
+    # is normally started outside Docker instead (see comment at the top).
+    command: ["celery", "-A", "vodpipe.server.tasks", "worker", "-l", "info",
+              "-Q", "celery", "-c", "1"]
     environment:
       VODPIPE_MEDIA: /media
-      VODPIPE_BROKER: amqp://guest:guest@rabbitmq:5672/
+      VODPIPE_BROKER: amqp://${VODPIPE_RABBIT_USER:-vodpipe}:${VODPIPE_RABBIT_PASS:-vodpipe-dev}@rabbitmq:5672/
       VODPIPE_BACKEND: redis://redis:6379/0
-      VODPIPE_FFMPEG: /usr/local/bin/ffmpeg
+      VODPIPE_FFMPEG: /usr/bin/ffmpeg
     volumes:
       - ./src_clip:/media/src_clip:ro
       - ./out:/media/out
