@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" role="img"
+ aria-label="M1 - VMAF against the 4K reference (upscale methodology)">
+<rect width="900" height="420" fill="#ffffff"/>
+<line x1="62" y1="362.0" x2="882" y2="362.0" stroke="#e6e8eb"/>
+<text x="54" y="366.0" text-anchor="end" font-size="11" fill="#57606a">0</text>
+<line x1="62" y1="298.8" x2="882" y2="298.8" stroke="#e6e8eb"/>
+<text x="54" y="302.8" text-anchor="end" font-size="11" fill="#57606a">19</text>
+<line x1="62" y1="235.6" x2="882" y2="235.6" stroke="#e6e8eb"/>
+<text x="54" y="239.6" text-anchor="end" font-size="11" fill="#57606a">38</text>
+<line x1="62" y1="172.4" x2="882" y2="172.4" stroke="#e6e8eb"/>
+<text x="54" y="176.4" text-anchor="end" font-size="11" fill="#57606a">57</text>
+<line x1="62" y1="109.2" x2="882" y2="109.2" stroke="#e6e8eb"/>
+<text x="54" y="113.2" text-anchor="end" font-size="11" fill="#57606a">76</text>
+<line x1="62" y1="46.0" x2="882" y2="46.0" stroke="#e6e8eb"/>
+<text x="54" y="50.0" text-anchor="end" font-size="11" fill="#57606a">95</text>
+<text x="144.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">2160p</text>
+<rect x="75.1" y="46.3" width="62.0" height="315.7" fill="#1f6feb"/>
+<text x="106.1" y="41.3" text-anchor="middle" font-size="10" fill="#57606a">94.9</text>
+<rect x="144.0" y="51.4" width="62.0" height="310.6" fill="#e53946"/>
+<text x="175.0" y="46.4" text-anchor="middle" font-size="10" fill="#57606a">93.37</text>
+<text x="308.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">1440p</text>
+<rect x="239.1" y="72.1" width="62.0" height="289.9" fill="#1f6feb"/>
+<text x="270.1" y="67.1" text-anchor="middle" font-size="10" fill="#57606a">87.14</text>
+<rect x="308.0" y="76.3" width="62.0" height="285.7" fill="#e53946"/>
+<text x="339.0" y="71.3" text-anchor="middle" font-size="10" fill="#57606a">85.9</text>
+<text x="472.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">1080p</text>
+<rect x="403.1" y="88.7" width="62.0" height="273.3" fill="#1f6feb"/>
+<text x="434.1" y="83.7" text-anchor="middle" font-size="10" fill="#57606a">82.16</text>
+<rect x="472.0" y="93.2" width="62.0" height="268.8" fill="#e53946"/>
+<text x="503.0" y="88.2" text-anchor="middle" font-size="10" fill="#57606a">80.82</text>
+<text x="636.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">720p</text>
+<rect x="567.1" y="108.8" width="62.0" height="253.2" fill="#1f6feb"/>
+<text x="598.1" y="103.8" text-anchor="middle" font-size="10" fill="#57606a">76.12</text>
+<rect x="636.0" y="117.3" width="62.0" height="244.7" fill="#e53946"/>
+<text x="667.0" y="112.3" text-anchor="middle" font-size="10" fill="#57606a">73.57</text>
+<text x="800.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">432p</text>
+<rect x="731.1" y="163.7" width="62.0" height="198.3" fill="#1f6feb"/>
+<text x="762.1" y="158.7" text-anchor="middle" font-size="10" fill="#57606a">59.61</text>
+<rect x="800.0" y="170.1" width="62.0" height="191.9" fill="#e53946"/>
+<text x="831.0" y="165.1" text-anchor="middle" font-size="10" fill="#57606a">57.69</text>
+<line x1="62" y1="362" x2="882" y2="362" stroke="#1f2328" stroke-width="1"/>
+<text x="14" y="204.0" font-size="12" fill="#57606a" transform="rotate(-90 14 204.0)" text-anchor="middle">VMAF</text>
+<text x="62" y="24" font-size="15" font-weight="600" fill="#1f2328">M1 - VMAF against the 4K reference (upscale methodology)</text>
+<rect x="62" y="395" width="11" height="11" fill="#1f6feb"/>
+<text x="78" y="404" font-size="11" fill="#57606a">VMAF mean</text>
+<rect x="149" y="395" width="11" height="11" fill="#e53946"/>
+<text x="165" y="404" font-size="11" fill="#57606a">VMAF min</text>
+<text x="882" y="404" text-anchor="end" font-size="10" fill="#57606a">mean and worst frame per rung</text>
+</svg>

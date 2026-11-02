@@ -1,0 +1,431 @@
+{
+  "job_id": "demo",
+  "meta": {
+    "ffmpeg": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "encoder": "h264_nvenc",
+    "preset": null,
+    "chunks": 1,
+    "source": "3840x2160@30.0 h264+aac, 24.00 s, 217704 kbps, IDR: 8",
+    "gpu": {
+      "codec": "h264_nvenc",
+      "cards": [
+        {
+          "index": 4,
+          "name": "NVIDIA GeForce RTX 3060",
+          "used": 2349,
+          "total": 12288,
+          "util": 12,
+          "nvenc": true,
+          "reason": "ok"
+        },
+        {
+          "index": 3,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16055,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 000001a866d378c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001a866d378c0] No capable device"
+        },
+        {
+          "index": 2,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16103,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 0000021aab2078c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000021aab2078c0] No capable device"
+        },
+        {
+          "index": 1,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16111,
+          "total": 16384,
+          "util": 99,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 0000014bdcd078c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000014bdcd078c0] No capable device"
+        },
+        {
+          "index": 0,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16159,
+          "total": 16384,
+          "util": 93,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 000001cb55cf78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001cb55cf78c0] No capable device"
+        }
+      ],
+      "picked": 4
+    },
+    "watermark": null,
+    "rungs": [
+      "2160p",
+      "1440p",
+      "1080p",
+      "720p",
+      "432p"
+    ]
+  },
+  "encode": [
+    {
+      "mode": "whole",
+      "rung": "2160p",
+      "encoder": "h264_nvenc",
+      "speed_x": 0.822,
+      "wall_s": 29.67,
+      "out": "work/demo/demo_2160p_h264_nvenc.ts",
+      "size": 87837172,
+      "rung_res": "3840x2160",
+      "target_kbps": 28000,
+      "measured": {
+        "video_kbps": 29123,
+        "audio_kbps": 129,
+        "codec": "h264",
+        "resolution": "3840x2160",
+        "total_kbps": 29253,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/demo/demo_2160p_h264_nvenc.mp4",
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1440p",
+      "encoder": "h264_nvenc",
+      "speed_x": 1.79,
+      "wall_s": 13.83,
+      "out": "work/demo/demo_1440p_h264_nvenc.ts",
+      "size": 35117272,
+      "rung_res": "2560x1440",
+      "target_kbps": 11000,
+      "measured": {
+        "video_kbps": 11564,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "2560x1440",
+        "total_kbps": 11695,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/demo/demo_1440p_h264_nvenc.mp4",
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1080p",
+      "encoder": "h264_nvenc",
+      "speed_x": 2.71,
+      "wall_s": 9.34,
+      "out": "work/demo/demo_1080p_h264_nvenc.ts",
+      "size": 20726248,
+      "rung_res": "1920x1080",
+      "target_kbps": 6500,
+      "measured": {
+        "video_kbps": 6772,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "1920x1080",
+        "total_kbps": 6902,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/demo/demo_1080p_h264_nvenc.mp4",
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "720p",
+      "encoder": "h264_nvenc",
+      "speed_x": 4.48,
+      "wall_s": 5.8,
+      "out": "work/demo/demo_720p_h264_nvenc.ts",
+      "size": 10949308,
+      "rung_res": "1280x720",
+      "target_kbps": 3200,
+      "measured": {
+        "video_kbps": 3515,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "1280x720",
+        "total_kbps": 3646,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/demo/demo_720p_h264_nvenc.mp4",
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "432p",
+      "encoder": "h264_nvenc",
+      "speed_x": 5.47,
+      "wall_s": 4.77,
+      "out": "work/demo/demo_432p_h264_nvenc.ts",
+      "size": 5135972,
+      "rung_res": "768x432",
+      "target_kbps": 1400,
+      "measured": {
+        "video_kbps": 1579,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "768x432",
+        "total_kbps": 1710,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/demo/demo_432p_h264_nvenc.mp4",
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    }
+  ],
+  "ladder_wall_s": 63.41,
+  "packaging": {
+    "hls": {
+      "kind": "hls",
+      "master": "out/demo/hls/master.m3u8",
+      "wall_s": 1.42,
+      "variants": [
+        {
+          "bandwidth": 31656548,
+          "resolution": "3840x2160",
+          "uri": "stream_2160p.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 12319668,
+          "resolution": "2560x1440",
+          "uri": "stream_1440p.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 7485362,
+          "resolution": "1920x1080",
+          "uri": "stream_1080p.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 3680874,
+          "resolution": "1280x720",
+          "uri": "stream_720p.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 1625346,
+          "resolution": "768x432",
+          "uri": "stream_432p.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        }
+      ],
+      "segments": 30
+    },
+    "dash": {
+      "kind": "dash",
+      "manifest": "out/demo/dash/manifest.mpd",
+      "wall_s": 1.37,
+      "representations": [
+        {
+          "media": "video",
+          "bandwidth": 28433354,
+          "width": 3840,
+          "height": 2160
+        },
+        {
+          "media": "video",
+          "bandwidth": 11235015,
+          "width": 2560,
+          "height": 1440
+        },
+        {
+          "media": "video",
+          "bandwidth": 6539322,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "media": "video",
+          "bandwidth": 3349598,
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "media": "video",
+          "bandwidth": 1453095,
+          "width": 768,
+          "height": 432
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null
+        }
+      ],
+      "segments": 75
+    },
+    "ladder": {
+      "variants": 5,
+      "ladder": [
+        {
+          "resolution": "3840x2160",
+          "total_kbps": 31656
+        },
+        {
+          "resolution": "2560x1440",
+          "total_kbps": 12319
+        },
+        {
+          "resolution": "1920x1080",
+          "total_kbps": 7485
+        },
+        {
+          "resolution": "1280x720",
+          "total_kbps": 3680
+        },
+        {
+          "resolution": "768x432",
+          "total_kbps": 1625
+        }
+      ],
+      "top_kbps": 31656,
+      "bottom_kbps": 1625
+    }
+  },
+  "vmaf": {
+    "2160p": {
+      "vmaf_mean": 94.9,
+      "vmaf_harmonic": 94.89,
+      "vmaf_min": 93.37,
+      "vmaf_p99": 96.8,
+      "frames": 720,
+      "wall_s": 56.43
+    },
+    "1440p": {
+      "vmaf_mean": 87.14,
+      "vmaf_harmonic": 87.14,
+      "vmaf_min": 85.9,
+      "vmaf_p99": 88.5,
+      "frames": 720,
+      "wall_s": 61.64
+    },
+    "1080p": {
+      "vmaf_mean": 82.16,
+      "vmaf_harmonic": 82.15,
+      "vmaf_min": 80.82,
+      "vmaf_p99": 83.47,
+      "frames": 720,
+      "wall_s": 57.44
+    },
+    "720p": {
+      "vmaf_mean": 76.12,
+      "vmaf_harmonic": 76.12,
+      "vmaf_min": 73.57,
+      "vmaf_p99": 77.41,
+      "frames": 720,
+      "wall_s": 54.74
+    },
+    "432p": {
+      "vmaf_mean": 59.61,
+      "vmaf_harmonic": 59.61,
+      "vmaf_min": 57.69,
+      "vmaf_p99": 60.33,
+      "frames": 720,
+      "wall_s": 51.9
+    }
+  },
+  "verify": [],
+  "total_wall_s": 359.11
+}

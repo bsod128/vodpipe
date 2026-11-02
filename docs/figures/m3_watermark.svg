@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" role="img"
+ aria-label="M3 - watermark cost: fused filters vs a second pass">
+<rect width="900" height="420" fill="#ffffff"/>
+<line x1="62" y1="362.0" x2="882" y2="362.0" stroke="#e6e8eb"/>
+<text x="54" y="366.0" text-anchor="end" font-size="11" fill="#57606a">0</text>
+<line x1="62" y1="298.8" x2="882" y2="298.8" stroke="#e6e8eb"/>
+<text x="54" y="302.8" text-anchor="end" font-size="11" fill="#57606a">4</text>
+<line x1="62" y1="235.6" x2="882" y2="235.6" stroke="#e6e8eb"/>
+<text x="54" y="239.6" text-anchor="end" font-size="11" fill="#57606a">8</text>
+<line x1="62" y1="172.4" x2="882" y2="172.4" stroke="#e6e8eb"/>
+<text x="54" y="176.4" text-anchor="end" font-size="11" fill="#57606a">12</text>
+<line x1="62" y1="109.2" x2="882" y2="109.2" stroke="#e6e8eb"/>
+<text x="54" y="113.2" text-anchor="end" font-size="11" fill="#57606a">16</text>
+<line x1="62" y1="46.0" x2="882" y2="46.0" stroke="#e6e8eb"/>
+<text x="54" y="50.0" text-anchor="end" font-size="11" fill="#57606a">20</text>
+<text x="144.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">none</text>
+<rect x="75.1" y="211.0" width="62.0" height="151.0" fill="#1f6feb"/>
+<text x="106.1" y="206.0" text-anchor="middle" font-size="10" fill="#57606a">9.56</text>
+<rect x="144.0" y="362.0" width="62.0" height="0.0" fill="#e53946"/>
+<text x="175.0" y="357.0" text-anchor="middle" font-size="10" fill="#57606a">0</text>
+<text x="308.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">static</text>
+<rect x="239.1" y="209.8" width="62.0" height="152.2" fill="#1f6feb"/>
+<text x="270.1" y="204.8" text-anchor="middle" font-size="10" fill="#57606a">9.63</text>
+<rect x="308.0" y="362.0" width="62.0" height="0.0" fill="#e53946"/>
+<text x="339.0" y="357.0" text-anchor="middle" font-size="10" fill="#57606a">0</text>
+<text x="472.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">dyn</text>
+<rect x="403.1" y="214.0" width="62.0" height="148.0" fill="#1f6feb"/>
+<text x="434.1" y="209.0" text-anchor="middle" font-size="10" fill="#57606a">9.37</text>
+<rect x="472.0" y="358.2" width="62.0" height="3.8" fill="#e53946"/>
+<text x="503.0" y="353.2" text-anchor="middle" font-size="10" fill="#57606a">0.24</text>
+<text x="636.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">dyn_ghost</text>
+<rect x="567.1" y="212.7" width="62.0" height="149.3" fill="#1f6feb"/>
+<text x="598.1" y="207.7" text-anchor="middle" font-size="10" fill="#57606a">9.45</text>
+<rect x="636.0" y="358.4" width="62.0" height="3.6" fill="#e53946"/>
+<text x="667.0" y="353.4" text-anchor="middle" font-size="10" fill="#57606a">0.23</text>
+<text x="800.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">twopass</text>
+<rect x="731.1" y="64.3" width="62.0" height="297.7" fill="#1f6feb"/>
+<text x="762.1" y="59.3" text-anchor="middle" font-size="10" fill="#57606a">18.84</text>
+<rect x="800.0" y="356.8" width="62.0" height="5.2" fill="#e53946"/>
+<text x="831.0" y="351.8" text-anchor="middle" font-size="10" fill="#57606a">0.33</text>
+<line x1="62" y1="362" x2="882" y2="362" stroke="#1f2328" stroke-width="1"/>
+<text x="14" y="204.0" font-size="12" fill="#57606a" transform="rotate(-90 14 204.0)" text-anchor="middle">seconds / VMAF points</text>
+<text x="62" y="24" font-size="15" font-weight="600" fill="#1f2328">M3 - watermark cost: fused filters vs a second pass</text>
+<rect x="62" y="395" width="11" height="11" fill="#1f6feb"/>
+<text x="78" y="404" font-size="11" fill="#57606a">wall, s</text>
+<rect x="135" y="395" width="11" height="11" fill="#e53946"/>
+<text x="151" y="404" font-size="11" fill="#57606a">VMAF drop vs clean</text>
+<text x="882" y="404" text-anchor="end" font-size="10" fill="#57606a">fused is inside the encode pass; twopass re-encodes everything</text>
+</svg>

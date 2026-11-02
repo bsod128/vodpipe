@@ -1,208 +1,307 @@
-# vodpipe — VOD-пайплайн на FFmpeg + NVENC
+# vodpipe
 
-Демонстрация навыков под вакансию **Video Processing Engineer / Media Backend Developer (FFmpeg)**.
-Всё, что заявлено ниже, прогнано end-to-end на реальном железе и подтверждено артефактами в `bench/`.
-Ничего не «приукрашено»: там, где гипотеза не подтвердилась, это написано прямо.
+A VOD transcoding pipeline built around FFmpeg and NVENC: ladder encoding, CMAF
+packaging (HLS + DASH) from one pass, watermarking, VMAF quality measurement, and
+a job queue with cooperative cancellation.
 
-Мастер-файл: `src_clip/4k_master.mp4` — 3840×2160@30, 24 с, ~218 Мбит/с, h264+aac.
+Everything in the Results section is measured on real hardware and committed as a
+machine-readable artifact under [`bench/`](bench). There are no estimates here.
 
-## Что где лежит
+```
+4K master -> probe -> ladder (5 rungs, NVENC) -> concat + integrity check
+                  -> CMAF packaging (HLS + DASH) -> VMAF / bitrate -> report
+                                     ^
+                       FastAPI + Celery + RabbitMQ/Redis
+```
 
-| Путь | Содержание |
+## Why this repo exists
+
+I come from frontend/Angular and wanted a video-processing role, so instead of
+claiming experience I built the thing and measured it. The interesting part is
+not that it works - it is what the measurements said, because three of the four
+answers contradicted what I had read on the internet:
+
+| Claim often repeated | What I measured (RTX 3060, ffmpeg 7.1) |
 |---|---|
-| `vodpipe/` | библиотека: probe → encode (whole/chunked) → packager (CMAF HLS+DASH) → quality (VMAF/PSNR), watermark, auto-GPU |
-| `run_m1.py` | M1: полный лестничный транскод 4K → 5 рангов, HLS+DASH, VMAF |
-| `run_m2.py` | M2: бенчматрица энкодеров и параллелизма (x264 vs NVENC, whole vs chunked×N) |
-| `run_m3.py` | M3: стоимость вотермаркинга (fused vs two-pass, дельта wall и VMAF) |
-| `api/` | FastAPI + Celery: очередь задач, прогресс, отмена, Range-раздача |
-| `docker-compose.yml` | RabbitMQ + Redis + API (воркер под GPU — в профиле `gpu`) |
-| `test_cancel.py` | E2E-проверка: submit → cancel посреди лестницы → `CANCELLED` с частичным результатом |
-| `bench/*.json` | машиночитаемые отчёты всех прогонов |
+| NVENC is ~10x faster than x264 | **1.3-1.7x** on these rungs. At 2160p NVENC is only 0.82x realtime |
+| Split the file, encode in parallel, get a speedup | On one GPU it is **strictly worse**: 2160p 29.8 s whole, 35.3 s at 8x8 |
+| Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free** (within noise, +-2%). A separate pass costs **+97.1%** |
 
-## Железо и почему оно такое
+The reason parallel chunking fails is that the NVENC block is a fixed unit on the
+card: one 4K encode already saturates it, so N processes only add contention plus
+concat cost. Chunking earns its keep in the other direction - it bounds memory
+and lets a job be resumed per chunk - and that is how the code uses it.
 
-4× Tesla V100 (индексы 0–3) + **RTX 3060 (индекс 4)**. Индексы нигде не захардкожены:
-`vodpipe/gpu.py` перед прогоном пробует каждый адаптер реальным `h264_nvenc`-спотом и выбирает
-первый годный, кешируя успех по кодеку. На этой машине V100 отпадают (VRAM занят чужими
-процессами, `CUDA_ERROR_OUT_OF_MEMORY`), выбирается 3060:
+## Quickstart
 
-```
-GPU 4 NVIDIA GeForce RTX 3060    free= 9627MiB util= 10% NVENC OK
-GPU 3 Tesla V100-SXM2-16GB       free=  329MiB NVENC fail <- cuCtxCreate CUDA_ERROR_OUT_OF_MEMORY
-...
-CUDA_VISIBLE_DEVICES=4
+No Docker and no GPU needed for the first three commands.
+
+```bash
+./scripts/bootstrap.sh          # venv, package, ffmpeg check, doctor, master
+.venv/bin/python -m vodpipe demo
 ```
 
-Отчёт о зондировании попадает в каждый `report.json` (`meta.gpu.cards[]` с причиной отказа по карте) —
-это важнее, чем «выбрали GPU 4»: видно, *почему*.
+Windows: `scripts\bootstrap.ps1`, then `.venv\Scripts\python -m vodpipe demo`.
+With `make`: `make doctor master demo`.
 
-FFmpeg: 7.1-essentials. NVENC из ночных сборок с драйвером 581.42 не работает (нужен ≥610),
-поэтому версия фиксируется через `VODPIPE_FFMPEG`.
+`vodpipe` needs ffmpeg on `PATH`, or `ffmpeg.exe`/`ffprobe.exe` in [`bin/`](bin),
+or `VODPIPE_FFMPEG` pointing at it. It never downloads a binary silently.
 
-## M1 — лестница 4K → HLS/DASH (пройдено)
+The source clip is **generated**, not downloaded (`vodpipe master`): a
+deterministic 4K lavfi composite (seed 42, 2-second GOP). Public sample mirrors
+are unreachable from several networks and carry licensing questions, so the
+pipeline is reproducible from an empty checkout instead. VMAF on synthetic
+content is not the same as on a film master; the ratios carry, the absolutes
+belong to this source.
 
-Прогон: `bench/m1_h264_nvenc_chunk8.json`. h264_nvenc, 8 чанков, лестница 2160/1440/1080/720/432p.
+## Commands
 
-| Ранг | wall, с | speed | HLS bitrate | VMAF mean | VMAF min |
-|---|---|---|---|---|---|
-| 2160p | 36.0 | 0.67× | 32 892 kbps | 94.88 | 93.56 |
-| 1440p | 17.8 | 1.35× | 12 337 kbps | 87.15 | 86.24 |
-| 1080p | 12.9 | 1.87× | 7 142 kbps | 82.17 | 81.13 |
-| 720p | 9.0 | 2.67× | 3 450 kbps | 76.14 | 72.03 |
-| 432p | 6.9 | 3.47× | 1 569 kbps | 59.63 | 57.69 |
-
-Ladder wall: **82.6 с** на 24 с материала (т.е. ~3.4× реального времени на всю лестницу из 5 рангов
-на одной GeForce). Упаковка: CMAF, один и тот же сегмент feed для HLS и DASH, `master.m3u8` +
-`manifest.mpd` с 5 video + 1 audio Representation.
-
-**Целостность после склейки чанков.** Склейка TS-чанков даёт контейнер с мусорной длительностью
-(на границе чанка PCR обнуляется). Поэтому проверка идёт по числу видео-пакетов
-(`== round(duration × fps)`, для 24 с @30 = 720) и каждый ранг перед упаковкой remux'ится
-в MP4 без перекодирования (`-c copy -movflags +faststart -fflags +genpts`) — это лечит стыковые
-разрывы, из-за иначе DASH/HLS-плеер рвёт картинку на склейках.
-
-## M2 — энкодеры и параллелизм (пройдено, вывод неприятный)
-
-Прогон: `bench/m2_bench.json`. Матрица: `libx264` medium / `h264_nvenc` whole /
-NVENC chunked (chunk×worker: 2×2, 4×4, 8×8, 8×4, повтор 8×8).
-
-| Ранг | x264 medium | NVENC whole | NVENC 2×2 | 4×4 | 8×8 | 8×4 |
-|---|---|---|---|---|---|---|
-| 2160p | 47.1 с (0.52×) | **29.8 с (0.82×)** | 30.1 | 31.5 | 35.3 | 35.8 |
-| 1080p | 15.9 с (1.54×) | **9.1 с (2.75×)** | 9.2 | 9.6 | 11.7 | 12.3 |
-| 720p | 9.3 с (2.66×) | **5.6 с (4.58×)** | 5.6 | 6.0 | 7.9 | 8.2 |
-
-Два вывода, которые важнее красивых цифр:
-
-1. **NVENC против x264-medium даёт лишь ~1.3–1.7× при равном битрейте.** Это не «в 10 раз быстрее»,
-   как обычно рисуют слайды. Выигрыш аппаратного кодека в скорости, а не в качестве: при
-   фиксированном целевом битрейте различие по времени скромное.
-2. **Чанкование на одной GeForce замедляет, а не ускоряет** — монотонно хуже с ростом числа
-   воркеров (2160p: 8 воркеров = +19% к wall против одного процесса). Причина: один NVENC-блок
-   на GPU, несколько процессов дерутся за него и за декодер, плюс перекос хвостов чанков.
-   Чанкование имеет смысл только **по разным GPU** (или когда GPU один, а узкое место — CPU-декод).
-   Код это умеет (`transcode_chunked`), но как инструмент горизонтального масштабирования,
-   а не «ускорителя на одной карте».
-
-## M3 — стоимость вотермаркинга (пройдено)
-
-Прогон: `bench/m3_watermark.json`. Ранг 1080p, h264_nvenc, 2 повтора на вариант.
-`fused` — вотермарк в том же filtergraph, что и scale (один проход); `twopass` — вотермарк
-отдельным проходом после транскода.
-
-| Режим | wall, с | overhead к базе | VMAF mean | VMAF min | kbps |
-|---|---|---|---|---|---|
-| none (база) | 9.56 | — | 82.16 | 80.82 | 6909 |
-| static (логотип+текст в углу) | 9.63 | **+0.7%** | 82.17 | 80.98 | 6916 |
-| dyn (дрейфующий персональный ID) | 9.37 | **−2.0%** | 81.92 | 80.57 | 6949 |
-| dyn + ghost (второй почти невидимый слой) | 9.45 | **−1.2%** | 81.93 | 80.41 | 6922 |
-| twopass (отдельный проход) | 18.84 | **+97.1%** | 81.83 | 80.52 | 7308 |
-
-Что из этого следует:
-
-* **Fused-вотермарк стоит ~нулей** (разброс −2…+0.7% лежит в шуме замеров: повтор базы сам
-  дал 9.68 и 9.45 с). Дрейфующий текст + второй невидимый слой для forensic-трейсинга — бесплатно,
-  пока фильтры в том же graph, что и scale.
-* **Two-pass ровно удваивает стоимость** (+97%) — это ровно то, чего избегают: второй проход
-  ещё раз декодирует, фильтрует и кодирует весь материал. Плюс двойная потеря качества:
-  вотермарк поверх уже сжатого видео добавляет артефакты, которые второй проход пересемплирует.
-* **ΔVMAF крошечный** (0.24–0.33 балла на 1080p) — вотермарк не «ломает» картинку с точки зрения
-  метрики, поэтому по одному лишь VMAF его присутствие не обнаружить; для forensic-водяных
-  знаков это скорее плюс (не видно), чем минус.
-
-## M4 — backend очереди (пройдено)
-
-Стек: **FastAPI → Celery → RabbitMQ** (broker) **+ Redis** (result backend, прогресс, флаг отмены).
-`docker-compose.yml` поднимает инфраструктуру; NVENC-воркер на этой машине живёт **на хосте**, потому
-что Docker Desktop не пробрасывает GPU в свою WSL2-виртуалку (`nvidia-container-cli: nvml error:
-unknown error`, `cuInit → CUDA_ERROR_NO_DEVICE` даже с `--device /dev/dxg`). В Linux-сервере
-воркер поднимается той же командой: `docker compose --profile gpu up`.
-
-API:
-
-| Метод | Назначение |
+| Command | What it does |
 |---|---|
-| `GET /health` | ping брокера (AMQP), Redis, глубина очереди прямо из `queue_declare` |
-| `POST /jobs` | 202 + `job_id`; source проверяется на «внутри media root» (защита от traversal) |
-| `GET /jobs/{id}` | состояние, прогресс, ранги, артефакты |
-| `POST /jobs/{id}/cancel` | кооперативная отмена |
-| `GET /jobs/{id}/report` | JSON-отчёт прогона |
-| `GET /media/{job}/{path}` | CMAF-манифесты и сегменты с Range |
+| `vodpipe doctor` | which ffmpeg, encoders, filters and GPUs this machine really has |
+| `vodpipe master` | generate the deterministic 4K source clip |
+| `vodpipe demo` | full pipeline on a chosen ladder, writes `bench/demo.json` |
+| `vodpipe bench` | encoder/parallelism matrix (M2) |
+| `vodpipe watermark` | watermark overhead matrix (M3) |
+| `vodpipe figures` | SVG charts from `bench/*.json` into `docs/figures/` |
+| `vodpipe job` | submit / poll / cancel against a running API |
 
-**Прогресс по рангам, а не по фазам.** Лестница из 5 рангов — это минуты, и если писать прогресс
-только между «encode → package → vmaf», клиент видит одну и ту же цифру minutes. Поэтому каждый
-завершённый ранг даёт `encode k/5` и прогресс 0.05..0.60 (`task.update_state(PROGRESS)`, читается
-тем же `AsyncResult`).
+Every command is a thin wrapper over the library: the same calls are available to
+the queue worker, the tests and a notebook without going through argparse.
 
-**Отмена.** `POST /cancel` ставит флаг в Redis; воркер проверяет его **на границе ранга**
-(`should_cancel`) и штатно возвращает частичный результат с `cancelled: true`. Celery-`revoke` для
-этого **не** используется: он помечает задачу `REVOKED` и **затирает результат**, а готовые ранги и отчёт
-терять нельзя. Проверено `test_cancel.py`:
+## Results
+
+### M1 - ladder of 5 rungs from a 24 s 4K master
+
+`h264_nvenc`, whole-file encode, wall time per rung; bitrate read back out of the
+HLS master playlist (BANDWIDTH is audio+video, which is what a player sees):
+
+| Rung | wall, s | speed | delivered bitrate | VMAF mean | VMAF min |
+|---|---|---|---|---|---|
+| 2160p | 29.7 | 0.82x | 31 656 kbps | 94.90 | 93.37 |
+| 1440p | 13.8 | 1.79x | 12 319 kbps | 87.14 | 85.90 |
+| 1080p | 9.3 | 2.71x | 7 485 kbps | 82.16 | 80.82 |
+| 720p | 5.8 | 4.48x | 3 680 kbps | 76.12 | 73.57 |
+| 432p | 4.8 | 5.47x | 1 625 kbps | 59.61 | 57.69 |
+
+Ladder wall time: **63.4 s** for five rungs, VMAF from 94.90 down to 59.61.
+Artifact: [`bench/demo.json`](bench) (`vodpipe demo`, whole-file encoding).
+
+The same ladder through the chunked path (8 chunks, 4 workers) is kept as
+[`bench/m1_h264_nvenc_chunk8.json`](bench): **82.6 s** ladder wall. Chunking cost
+~19 s here and added a concat step - the M2 result again, at ladder scale. VMAF
+per rung is identical to within 0.05, as it should be: splitting the work must
+not change what is encoded, only how it is split.
+
+![M1 time and bitrate](docs/figures/m1_time_bitrate.svg)
+![M1 VMAF](docs/figures/m1_vmaf.svg)
+
+### M2 - encoder and parallelism matrix
+
+Wall time per rung (lower is better). x264 at `medium`, NVENC whole-file, then
+chunked with 2x2 / 4x4 / 8x8 workers:
+
+| Rung | x264 medium | NVENC whole | 2x2 | 4x4 | 8x8 |
+|---|---|---|---|---|---|
+| 2160p | 47.1 s (0.52x) | **29.8 s (0.82x)** | 30.1 | 31.5 | 35.3 |
+| 1080p | 15.9 s (1.54x) | **9.1 s (2.75x)** | 9.2 | 9.6 | 11.7 |
+| 720p | 9.3 s (2.66x) | **5.6 s (4.58x)** | 5.6 | 6.0 | 7.9 |
+
+Chunking never wins on one card, at any rung. The per-process throughput does go
+up, which is why a benchmark that reports only "speed" would have called it a
+win: the code reports `wall_s` and `agg_speed_x` separately, because wall time is
+what a user waits for.
+
+Artifact: [`bench/m2_bench.json`](bench).
+
+![M2 scaling](docs/figures/m2_scaling.svg)
+
+### M3 - watermark cost
+
+Same rung (1080p), same encoder, each variant repeated twice:
+
+| Mode | wall, s | overhead | VMAF mean | VMAF min | kbps |
+|---|---|---|---|---|---|
+| none (baseline) | 9.56 | - | 82.16 | 80.82 | 6909 |
+| static corner logo | 9.63 | **+0.7%** | 82.17 | 80.98 | 6916 |
+| drifting per-viewer id | 9.37 | **-2.0%** | 81.92 | 80.57 | 6949 |
+| + near-invisible second layer | 9.45 | **-1.2%** | 81.93 | 80.41 | 6922 |
+| separate watermark pass | 18.84 | **+97.1%** | 81.83 | 80.52 | 7308 |
+
+The first four are inside noise - the baseline itself measured 9.68 s and 9.45 s
+across two runs, which is why every variant is repeated. Fused filters ride the
+decode that the encode already performs, so they are close to free. A second
+pass decodes and re-encodes the whole asset, so it doubles the cost.
+
+The dynamic mark drifts in position and alpha as a function of `t`, so there is
+no fixed pixel region to crop or box-blur out; the ghost layer runs at a
+different phase, so cropping one mark still leaves the other in another frame
+range. This is session identification, not a forensic watermark: it does not
+survive a re-encode of the picture. Forensic marking needs a robust payload
+spread across frames (DCT-band coefficients), which I have not built.
+
+Artifact: [`bench/m3_watermark.json`](bench).
+
+![M3 watermark](docs/figures/m3_watermark.svg)
+
+### M4 - queue, progress, cancellation
+
+Submit a 3-rung ladder and cancel it at `encode 1/3`:
 
 ```
-submit: 202 PENDING
-  RUNNING p=0.02: probe
-  RUNNING p=0.233: encode 1/3
+$ vodpipe job --source src_clip/4k_master.mp4 --rungs 2160p,1440p,1080p --cancel-at 1/3
+job: b3978ecc0e91
+  PENDING p=0.0: queued
+  RUNNING p=0.01: gpu-probe
+  RUNNING p=0.21: encode 1/3
   -> cancel at encode 1/3
   CANCELLED p=1.0: cancelled
-report: cancelled = True | rungs: ['2160p', '1440p'] | ladder_wall_s: 44.47 | total_wall_s: 46.18
-ASSERT partial-cancel report: OK
 ```
 
-То есть из 3 рангов дожали 2, они в отчёте, статус — отдельный терминальный `CANCELLED`
-(SUCCESS для Celery, но клиент видит «отменено», а не «упало»).
+Result: status `CANCELLED`, the rungs finished before the cancel (`2160p`,
+`1080p`) kept with their measured bitrates (29 123 and 6 772 kbps), the third
+rung marked `cancelled`, ladder wall 39.19 s, report preserved. A cancelled job
+is not a failed job: its finished output is still usable. Artifact:
+[`bench/m4_cancelled_report.json`](bench).
 
-**Раздача.** Range-заголовки: `206` с корректным `Content-Range`, `416` на битый диапазон,
-MIME по расширению (`.m3u8` → `application/vnd.apple.mpegurl`, `.m4s` → `video/iso.segment`,
-`.mpd` → `application/dash+xml`), выход за каталог задачи → `404`.
+Two things had to be understood rather than guessed:
 
-Успешный E2E-прогон: `ad68cd08aeee` — 2 ранга, 18.4 с от submit до SUCCESS; вотермарк проверен
-покадрово (текст дрейфует по кадру, на извлечённых кадрах видно смещение).
+* **Celery's `revoke()` is wrong here.** It marks the task `REVOKED` *and wipes
+  the stored result*, which throws away the rungs that finished successfully.
+  Cancellation is instead a Redis flag checked between rungs, and a TTL so a
+  stale flag can never cancel a later job.
+* **Progress must be per rung, not per phase.** A five-rung ladder takes
+  minutes; reporting only between phases means the client stares at one number
+  the whole time. `on_rung_done` fires after every rung.
 
-## Как запустить
+## Design
 
-```powershell
-cd T:\resume\media
+**Pure core, imperative shell.** Every stage is split into a function that builds
+the argv (no process, no GPU, unit-testable) and a runner that executes it:
+`whole_args()` / `transcode_whole()`, `hls_args()` / `package_hls()`,
+`vmaf_args()` / `vmaf()`. `ff.Runner(execute=..., on_start=...)` is the only
+place a subprocess is created, so tests pass a fake and the worker can attach a
+cancel check without touching the pipeline.
 
-# 1) инфраструктура (RabbitMQ + Redis + API)
-docker compose up -d --build
+That split is what makes 123 tests runnable on a GPU-less CI runner: the parts
+that decide *what* to run are tested directly, the parts that run them carry the
+`ffmpeg` / `gpu` markers and skip.
 
-# 2) воркер на хосте (GPU сюда не пробрасывается, см. M4)
-cd api
-$env:VODPIPE_BROKER="amqp://guest:guest@localhost:5672/"
-$env:VODPIPE_BACKEND="redis://localhost:6379/0"
-C:/Python312/python.exe tasks.py          # celery -P threads на Windows
-cd ..
+| Module | Responsibility |
+|---|---|
+| `ff.py` | binary discovery, the one `Runner`, ffmpeg output parsers |
+| `probe.py` | source metadata, `plan_chunks` (chunk boundaries on IDR frames only) |
+| `ladder.py` | rung definition and the invariants a ladder must satisfy |
+| `encoders.py` | per-encoder argv, option spellings resolved at runtime |
+| `encode.py` | whole-file and chunked encode, parallel workers |
+| `ts.py` | concat, and the packet-count integrity proof |
+| `packager.py` | CMAF HLS + DASH in one pass, manifest parsing |
+| `metrics.py` | VMAF (upscale methodology), SSIM/PSNR, bitrate |
+| `watermark.py` | filter fragments and the escaping they need |
+| `gpu.py` | card discovery and an actual NVENC probe per card |
+| `pipeline.py` | orchestration, progress and cancellation hooks |
+| `jobs.py` | queue state semantics, stdlib only |
+| `mediarange.py` | RFC 7233 ranges and media MIME types |
+| `server/` | FastAPI intake, Celery worker, byte-range delivery |
 
-# 3) задачи
-python test_cancel.py "2160p,1440p,1080p" "1/3"      # E2E + проверка отмены
-curl http://127.0.0.1:8000/health
-curl -X POST http://127.0.0.1:8000/jobs -H "Content-Type: application/json" -d "{\"source\":\"src_clip/4k_master.mp4\",\"rungs\":[\"1080p\",\"720p\"],\"watermark\":{\"text\":\"SUB-123\",\"opacity\":0.2}}"
+Five decisions I would defend in a review:
 
-# 4) бенчмарки (артефакты в bench/)
-python run_m1.py --encoder h264_nvenc --chunked 8 8
-python run_m2.py --rungs 2160p,1080p,720p --metrics
-python run_m3.py --rung 1080p --reps 2
+1. **Every rung is exactly 16:9 with dimensions divisible by 8.** The textbook
+   "480p = 854x480" has DAR 427:240, and the DASH muxer then refuses the whole
+   manifest ("Conflicting stream aspect ratios values in AdaptationSet"). The
+   ladder uses 432p (768x432) instead. `ladder.validate()` rejects it up front.
+2. **Chunk boundaries are IDR frames only.** Cutting mid-GOP produces a chunk
+   whose first frame references frames that do not exist. `plan_chunks()` chooses
+   from the keyframe list, and a test asserts contiguity and exact coverage.
+3. **Container duration is not trusted on concatenated TS.** Each chunk carries
+   its own PCR, so ffprobe reports a duration that lies. Integrity is proven by
+   counting video packets against the expected frame count (`ts.verify_concat`).
+4. **GPU index is never hardcoded.** The order changes with the hardware
+   configuration - a hardcoded index 0 pointed at a datacenter card whose NVENC
+   cannot even initialize. `gpu.pick()` ranks cards and then *probes* each with
+   one second of real encoding, caching only successes.
+5. **Option spellings are read, not guessed.** One build accepts `-spatial_aq`,
+   another `-spatial-aq`; guessing wrong does not degrade quietly, it exits with
+   "Unrecognized option". `ff.pick_option()` reads `ffmpeg -h encoder=<codec>`.
+
+Bugs the tests caught, worth naming because they were silent:
+
+* the HLS parser matched `BANDWIDTH=` and hit `AVERAGE-BANDWIDTH=` first, which
+  ffmpeg emits *before* BANDWIDTH - every rung reported the wrong bitrate;
+* a `-filters` regex assumed a 6-char flag column; ffmpeg 7.x prints 3, so every
+  capability check silently returned "not available";
+* `expected_video_frames` was called through the wrong module, raising
+  `AttributeError` on the live path after every ladder.
+
+## Quality measurement
+
+VMAF compares the **distorted rendition upscaled to the reference size** against
+the full reference. Comparing a 1080p rung against a 1080p slice of the source
+measures mostly the scaler. `n_threads=8` matters as much: libvmaf defaults to
+one thread (~1.8 fps on 4K), and with 8 threads it ran at ~13.7 fps. A metric
+slower than the encode is a metric nobody runs on a catalogue.
+
+Harmonic mean is the number quoted for a ladder because it punishes the bad
+frames instead of averaging them away, and `vmaf_min` is reported per rung - the
+mean hides exactly the frames that make a viewer quit.
+
+## API
+
+| Method | Purpose |
+|---|---|
+| `GET /health` | probes broker, result backend and queue depth separately |
+| `POST /jobs` | 202 + `job_id`; source must live inside the media root |
+| `GET /jobs/{id}` | state, progress, per-rung rows, artifacts |
+| `POST /jobs/{id}/cancel` | cooperative cancel at the next rung boundary |
+| `GET /jobs/{id}/report` | the run's JSON report |
+| `GET /media/{job}/{path}` | manifests and segments, byte-range support |
+
+Queue depth is read with `queue_declare` straight from AMQP - declaring is
+idempotent, so this needs no management API and no extra credentials.
+
+Running it:
+
+```bash
+docker compose up -d rabbitmq redis       # infrastructure
+python -m vodpipe.server.tasks            # worker on the host
+python -m vodpipe.server.main             # API
 ```
 
-`ff.work_root()` сам выбирает диск с запасом места; для 4K нужно ~3 ГБ на лестницу.
+On this machine the worker runs on the host because Docker Desktop cannot pass a
+GPU into its WSL2 VM (`cuInit` -> `CUDA_ERROR_NO_DEVICE`). On a Linux server the
+same image covers the worker: `docker compose --profile gpu up worker`. Celery on
+Windows needs `-P threads` (no fork); concurrency is 1 either way, since one NVENC
+session already saturates a card.
 
-## Сводка результатов
+## Tests, lint, CI
 
-| | результат | артефакт |
-|---|---|---|
-| M1 | лестница 5 рангов из 4K за 82.6 с, CMAF HLS+DASH, VMAF 94.9 → 59.6 | `bench/m1_h264_nvenc_chunk8.json` |
-| M2 | NVENC vs x264-medium: 1.3–1.7×; чанкование на одной GPU медленнее (до +19%) | `bench/m2_bench.json` |
-| M3 | fused-вотермарк ≈ 0% overhead; отдельный проход = +97.1% | `bench/m3_watermark.json` |
-| M4 | FastAPI+Celery+RabbitMQ+Redis: прогресс по рангам, отмена с частичным результатом, Range-раздача | `test_cancel.py` (выход 0) |
+```bash
+pytest -q                 # 126 tests; ffmpeg/gpu marked tests skip without hardware
+ruff check src tests
+mypy
+```
 
-## Что бы я делал дальше на проде
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs ruff and pytest on
+Python 3.10 and 3.12 with ffmpeg installed and no GPU, which is exactly the split
+the design is built around.
 
-* Один NVENC-блок на карте → реальное масштабирование это **пул воркеров на разных GPU**
-  (или A10/L4 с несколькими NVENC-блоками), а не чанки внутри одной карты.
-* `two-pass` вотермарк (см. M3) в проде не нужен: fused-фильтр в том же filtergraph дешевле
-  ровно на один полный проход перекодирования.
-* Персональный (forensic) вотермарк требует, чтобы сегменты генерировались **на лету под сессию**
-  (CMAF + signing/пакгер с подменой сессии), иначе защита — декорация.
-* VMAF на всём каталоге не считают: выборка сцен + `n_threads`, иначе метрика дороже самого транскода
-  (на 4K-референсе 1.8 fps → 13.7 fps после тюнинга, 7.5×).
+The tests concentrate on the parts that are invisible at a glance: argv
+construction, ffmpeg's text output parsing, range handling, ladder invariants,
+job state mapping, and the escaping rules that decide whether a filtergraph
+parses at all.
+
+## Honest limitations
+
+* One RTX 3060. No multi-GPU measurement, and the chunking conclusion is only
+  about a single card - across cards the picture is different.
+* The source is synthetic. VMAF absolutes belong to it; ratios and the
+  encoder/parallelism conclusions transfer, absolute quality numbers do not.
+* Watermarking is session identification, not forensic marking.
+* `hevc_nvenc` and `h264_qsv` are wired and verified to exist; only the h264 path
+  was benchmarked end to end.
+* No content-protection stack (no DRM, no AES-128 sample-AES in the manifests).
+* The queue is proven on one host with one worker. No autoscaling, no sharding.
+
+## License
+
+MIT - see [LICENSE](LICENSE). Changes: [CHANGELOG.md](CHANGELOG.md).

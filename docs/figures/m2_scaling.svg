@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="420" viewBox="0 0 900 420" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" role="img"
+ aria-label="M2 - chunking on one GPU: more workers, more wall time">
+<rect width="900" height="420" fill="#ffffff"/>
+<line x1="62" y1="362.0" x2="882" y2="362.0" stroke="#e6e8eb"/>
+<text x="54" y="366.0" text-anchor="end" font-size="11" fill="#57606a">0</text>
+<line x1="62" y1="298.8" x2="882" y2="298.8" stroke="#e6e8eb"/>
+<text x="54" y="302.8" text-anchor="end" font-size="11" fill="#57606a">9.5</text>
+<line x1="62" y1="235.6" x2="882" y2="235.6" stroke="#e6e8eb"/>
+<text x="54" y="239.6" text-anchor="end" font-size="11" fill="#57606a">19</text>
+<line x1="62" y1="172.4" x2="882" y2="172.4" stroke="#e6e8eb"/>
+<text x="54" y="176.4" text-anchor="end" font-size="11" fill="#57606a">28.5</text>
+<line x1="62" y1="109.2" x2="882" y2="109.2" stroke="#e6e8eb"/>
+<text x="54" y="113.2" text-anchor="end" font-size="11" fill="#57606a">38</text>
+<line x1="62" y1="46.0" x2="882" y2="46.0" stroke="#e6e8eb"/>
+<text x="54" y="50.0" text-anchor="end" font-size="11" fill="#57606a">47.5</text>
+<text x="198.7" y="380" text-anchor="middle" font-size="12" fill="#1f2328">2160p</text>
+<rect x="83.9" y="149.8" width="29.5" height="212.2" fill="#1f6feb"/>
+<text x="98.6" y="144.8" text-anchor="middle" font-size="10" fill="#57606a">31.9</text>
+<rect x="116.7" y="161.8" width="29.5" height="200.2" fill="#e53946"/>
+<text x="131.4" y="156.8" text-anchor="middle" font-size="10" fill="#57606a">30.1</text>
+<rect x="149.5" y="152.8" width="29.5" height="209.2" fill="#2ea043"/>
+<text x="164.2" y="147.8" text-anchor="middle" font-size="10" fill="#57606a">31.45</text>
+<rect x="182.3" y="124.0" width="29.5" height="238.0" fill="#bf8700"/>
+<text x="197.0" y="119.0" text-anchor="middle" font-size="10" fill="#57606a">35.78</text>
+<rect x="215.1" y="127.2" width="29.5" height="234.8" fill="#8250df"/>
+<text x="229.8" y="122.2" text-anchor="middle" font-size="10" fill="#57606a">35.3</text>
+<rect x="247.9" y="164.0" width="29.5" height="198.0" fill="#0969da"/>
+<text x="262.6" y="159.0" text-anchor="middle" font-size="10" fill="#57606a">29.77</text>
+<rect x="280.7" y="49.0" width="29.5" height="313.0" fill="#1f6feb"/>
+<text x="295.4" y="44.0" text-anchor="middle" font-size="10" fill="#57606a">47.05</text>
+<text x="472.0" y="380" text-anchor="middle" font-size="12" fill="#1f2328">1080p</text>
+<rect x="357.2" y="289.7" width="29.5" height="72.3" fill="#1f6feb"/>
+<text x="372.0" y="284.7" text-anchor="middle" font-size="10" fill="#57606a">10.87</text>
+<rect x="390.0" y="301.1" width="29.5" height="60.9" fill="#e53946"/>
+<text x="404.8" y="296.1" text-anchor="middle" font-size="10" fill="#57606a">9.15</text>
+<rect x="422.8" y="298.1" width="29.5" height="63.9" fill="#2ea043"/>
+<text x="437.6" y="293.1" text-anchor="middle" font-size="10" fill="#57606a">9.6</text>
+<rect x="455.6" y="280.2" width="29.5" height="81.8" fill="#bf8700"/>
+<text x="470.4" y="275.2" text-anchor="middle" font-size="10" fill="#57606a">12.29</text>
+<rect x="488.4" y="283.9" width="29.5" height="78.1" fill="#8250df"/>
+<text x="503.2" y="278.9" text-anchor="middle" font-size="10" fill="#57606a">11.74</text>
+<rect x="521.2" y="301.3" width="29.5" height="60.7" fill="#0969da"/>
+<text x="536.0" y="296.3" text-anchor="middle" font-size="10" fill="#57606a">9.13</text>
+<rect x="554.0" y="256.4" width="29.5" height="105.6" fill="#1f6feb"/>
+<text x="568.8" y="251.4" text-anchor="middle" font-size="10" fill="#57606a">15.87</text>
+<text x="745.3" y="380" text-anchor="middle" font-size="12" fill="#1f2328">720p</text>
+<rect x="630.5" y="313.2" width="29.5" height="48.8" fill="#1f6feb"/>
+<text x="645.3" y="308.2" text-anchor="middle" font-size="10" fill="#57606a">7.34</text>
+<rect x="663.3" y="324.9" width="29.5" height="37.1" fill="#e53946"/>
+<text x="678.1" y="319.9" text-anchor="middle" font-size="10" fill="#57606a">5.58</text>
+<rect x="696.1" y="321.9" width="29.5" height="40.1" fill="#2ea043"/>
+<text x="710.9" y="316.9" text-anchor="middle" font-size="10" fill="#57606a">6.03</text>
+<rect x="728.9" y="307.3" width="29.5" height="54.7" fill="#bf8700"/>
+<text x="743.7" y="302.3" text-anchor="middle" font-size="10" fill="#57606a">8.22</text>
+<rect x="761.7" y="309.7" width="29.5" height="52.3" fill="#8250df"/>
+<text x="776.5" y="304.7" text-anchor="middle" font-size="10" fill="#57606a">7.86</text>
+<rect x="794.5" y="324.5" width="29.5" height="37.5" fill="#0969da"/>
+<text x="809.3" y="319.5" text-anchor="middle" font-size="10" fill="#57606a">5.64</text>
+<rect x="827.3" y="300.4" width="29.5" height="61.6" fill="#1f6feb"/>
+<text x="842.1" y="295.4" text-anchor="middle" font-size="10" fill="#57606a">9.26</text>
+<line x1="62" y1="362" x2="882" y2="362" stroke="#1f2328" stroke-width="1"/>
+<text x="14" y="204.0" font-size="12" fill="#57606a" transform="rotate(-90 14 204.0)" text-anchor="middle">wall, seconds</text>
+<text x="62" y="24" font-size="15" font-weight="600" fill="#1f2328">M2 - chunking on one GPU: more workers, more wall time</text>
+<rect x="62" y="395" width="11" height="11" fill="#1f6feb"/>
+<text x="78" y="404" font-size="11" fill="#57606a">nvenc_p1_c8w8</text>
+<rect x="177" y="395" width="11" height="11" fill="#e53946"/>
+<text x="193" y="404" font-size="11" fill="#57606a">nvenc_p5_c2w2</text>
+<rect x="292" y="395" width="11" height="11" fill="#2ea043"/>
+<text x="308" y="404" font-size="11" fill="#57606a">nvenc_p5_c4w4</text>
+<rect x="407" y="395" width="11" height="11" fill="#bf8700"/>
+<text x="423" y="404" font-size="11" fill="#57606a">nvenc_p5_c8w4</text>
+<rect x="522" y="395" width="11" height="11" fill="#8250df"/>
+<text x="538" y="404" font-size="11" fill="#57606a">nvenc_p5_c8w8</text>
+<rect x="637" y="395" width="11" height="11" fill="#0969da"/>
+<text x="653" y="404" font-size="11" fill="#57606a">nvenc_p5_whole</text>
+<rect x="759" y="395" width="11" height="11" fill="#1f6feb"/>
+<text x="775" y="404" font-size="11" fill="#57606a">x264_medium_whole</text>
+<text x="882" y="404" text-anchor="end" font-size="10" fill="#57606a">lower is better; NVENC block is single per card</text>
+</svg>

@@ -7,7 +7,7 @@
       4
     ],
     "source": "3840x2160@30.0 h264+aac, 24.00 с, 217704 кбит/с, IDR: 8",
-    "source_path": "T:\\resume\\media\\src_clip\\4k_master.mp4",
+    "source_path": "src_clip/4k_master.mp4",
     "duration": 24.0,
     "gpu": {
       "codec": "h264_nvenc",
@@ -77,7 +77,7 @@
       "wall_s": 36.0,
       "speed_x": 0.667,
       "agg_speed_x": 0.171,
-      "out": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_2160p_h264_nvenc.ts",
+      "out": "work/m1/h264_nvenc_chunk8_2160p_h264_nvenc.ts",
       "size": 101107716,
       "chunks": [
         {
@@ -149,7 +149,7 @@
       "normalize": {
         "ok": true,
         "vpkts_ok": true,
-        "mp4": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_2160p_h264_nvenc.mp4",
+        "mp4": "work/m1/h264_nvenc_chunk8_2160p_h264_nvenc.mp4",
         "before": {
           "duration": 3.029,
           "vpkts": 720,
@@ -174,7 +174,7 @@
       "wall_s": 17.77,
       "speed_x": 1.35,
       "agg_speed_x": 0.361,
-      "out": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_1440p_h264_nvenc.ts",
+      "out": "work/m1/h264_nvenc_chunk8_1440p_h264_nvenc.ts",
       "size": 38098576,
       "chunks": [
         {
@@ -246,7 +246,7 @@
       "normalize": {
         "ok": true,
         "vpkts_ok": true,
-        "mp4": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_1440p_h264_nvenc.mp4",
+        "mp4": "work/m1/h264_nvenc_chunk8_1440p_h264_nvenc.mp4",
         "before": {
           "duration": 3.029,
           "vpkts": 720,
@@ -271,7 +271,7 @@
       "wall_s": 12.87,
       "speed_x": 1.865,
       "agg_speed_x": 0.526,
-      "out": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_1080p_h264_nvenc.ts",
+      "out": "work/m1/h264_nvenc_chunk8_1080p_h264_nvenc.ts",
       "size": 22175916,
       "chunks": [
         {
@@ -343,7 +343,7 @@
       "normalize": {
         "ok": true,
         "vpkts_ok": true,
-        "mp4": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_1080p_h264_nvenc.mp4",
+        "mp4": "work/m1/h264_nvenc_chunk8_1080p_h264_nvenc.mp4",
         "before": {
           "duration": 3.029,
           "vpkts": 720,
@@ -368,7 +368,7 @@
       "wall_s": 9.0,
       "speed_x": 2.667,
       "agg_speed_x": 0.786,
-      "out": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_720p_h264_nvenc.ts",
+      "out": "work/m1/h264_nvenc_chunk8_720p_h264_nvenc.ts",
       "size": 10861324,
       "chunks": [
         {
@@ -440,7 +440,7 @@
       "normalize": {
         "ok": true,
         "vpkts_ok": true,
-        "mp4": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_720p_h264_nvenc.mp4",
+        "mp4": "work/m1/h264_nvenc_chunk8_720p_h264_nvenc.mp4",
         "before": {
           "duration": 3.029,
           "vpkts": 720,
@@ -465,7 +465,7 @@
       "wall_s": 6.92,
       "speed_x": 3.466,
       "agg_speed_x": 1.002,
-      "out": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_432p_h264_nvenc.ts",
+      "out": "work/m1/h264_nvenc_chunk8_432p_h264_nvenc.ts",
       "size": 5097432,
       "chunks": [
         {
@@ -537,7 +537,7 @@
       "normalize": {
         "ok": true,
         "vpkts_ok": true,
-        "mp4": "T:\\resume\\media\\work\\m1\\h264_nvenc_chunk8_432p_h264_nvenc.mp4",
+        "mp4": "work/m1/h264_nvenc_chunk8_432p_h264_nvenc.mp4",
         "before": {
           "duration": 3.029,
           "vpkts": 720,
@@ -556,7 +556,7 @@
   "packaging": {
     "hls": {
       "kind": "hls",
-      "master": "T:\\resume\\media\\out\\hls\\master.m3u8",
+      "master": "out/hls/master.m3u8",
       "wall_s": 1.45,
       "variants": [
         {
@@ -589,7 +589,7 @@
     },
     "dash": {
       "kind": "dash",
-      "manifest": "T:\\resume\\media\\out\\dash\\manifest.mpd",
+      "manifest": "out/dash/manifest.mpd",
       "wall_s": 1.42,
       "representations": [
         {

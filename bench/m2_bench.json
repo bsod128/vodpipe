@@ -77,7 +77,7 @@
       "encoder": "libx264",
       "speed_x": 0.518,
       "wall_s": 47.05,
-      "out": "T:\\resume\\media\\work\\m2\\m2_x264_medium_whole_2160p.ts",
+      "out": "work/m2/m2_x264_medium_whole_2160p.ts",
       "size": 81227844,
       "tag": "x264_medium_whole",
       "kbps": 27076,
@@ -98,7 +98,7 @@
       "encoder": "h264_nvenc",
       "speed_x": 0.819,
       "wall_s": 29.77,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_whole_2160p.ts",
+      "out": "work/m2/m2_nvenc_p5_whole_2160p.ts",
       "size": 87837172,
       "tag": "nvenc_p5_whole",
       "kbps": 29279,
@@ -124,7 +124,7 @@
       "wall_s": 30.1,
       "speed_x": 0.797,
       "agg_speed_x": 0.406,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c2w2_2160p.ts",
+      "out": "work/m2/m2_nvenc_p5_c2w2_2160p.ts",
       "size": 89334592,
       "chunks": [
         {
@@ -168,7 +168,7 @@
       "wall_s": 31.45,
       "speed_x": 0.763,
       "agg_speed_x": 0.223,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c4w4_2160p.ts",
+      "out": "work/m2/m2_nvenc_p5_c4w4_2160p.ts",
       "size": 92718216,
       "chunks": [
         {
@@ -226,7 +226,7 @@
       "wall_s": 35.3,
       "speed_x": 0.68,
       "agg_speed_x": 0.086,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w8_2160p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w8_2160p.ts",
       "size": 101107716,
       "chunks": [
         {
@@ -312,7 +312,7 @@
       "wall_s": 35.78,
       "speed_x": 0.671,
       "agg_speed_x": 0.172,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w4_2160p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w4_2160p.ts",
       "size": 101107716,
       "chunks": [
         {
@@ -398,7 +398,7 @@
       "wall_s": 31.9,
       "speed_x": 0.752,
       "agg_speed_x": 0.098,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p1_c8w8_2160p.ts",
+      "out": "work/m2/m2_nvenc_p1_c8w8_2160p.ts",
       "size": 89962700,
       "chunks": [
         {
@@ -479,7 +479,7 @@
       "encoder": "libx264",
       "speed_x": 1.54,
       "wall_s": 15.87,
-      "out": "T:\\resume\\media\\work\\m2\\m2_x264_medium_whole_1080p.ts",
+      "out": "work/m2/m2_x264_medium_whole_1080p.ts",
       "size": 20554604,
       "tag": "x264_medium_whole",
       "kbps": 6852,
@@ -500,7 +500,7 @@
       "encoder": "h264_nvenc",
       "speed_x": 2.75,
       "wall_s": 9.13,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_whole_1080p.ts",
+      "out": "work/m2/m2_nvenc_p5_whole_1080p.ts",
       "size": 20726248,
       "tag": "nvenc_p5_whole",
       "kbps": 6909,
@@ -526,7 +526,7 @@
       "wall_s": 9.15,
       "speed_x": 2.624,
       "agg_speed_x": 1.38,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c2w2_1080p.ts",
+      "out": "work/m2/m2_nvenc_p5_c2w2_1080p.ts",
       "size": 20884732,
       "chunks": [
         {
@@ -570,7 +570,7 @@
       "wall_s": 9.6,
       "speed_x": 2.5,
       "agg_speed_x": 0.73,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c4w4_1080p.ts",
+      "out": "work/m2/m2_nvenc_p5_c4w4_1080p.ts",
       "size": 21712496,
       "chunks": [
         {
@@ -628,7 +628,7 @@
       "wall_s": 11.74,
       "speed_x": 2.044,
       "agg_speed_x": 0.275,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w8_1080p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w8_1080p.ts",
       "size": 22175916,
       "chunks": [
         {
@@ -714,7 +714,7 @@
       "wall_s": 12.29,
       "speed_x": 1.954,
       "agg_speed_x": 0.537,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w4_1080p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w4_1080p.ts",
       "size": 22175916,
       "chunks": [
         {
@@ -800,7 +800,7 @@
       "wall_s": 10.87,
       "speed_x": 2.207,
       "agg_speed_x": 0.301,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p1_c8w8_1080p.ts",
+      "out": "work/m2/m2_nvenc_p1_c8w8_1080p.ts",
       "size": 21734116,
       "chunks": [
         {
@@ -881,7 +881,7 @@
       "encoder": "libx264",
       "speed_x": 2.66,
       "wall_s": 9.26,
-      "out": "T:\\resume\\media\\work\\m2\\m2_x264_medium_whole_720p.ts",
+      "out": "work/m2/m2_x264_medium_whole_720p.ts",
       "size": 10501492,
       "tag": "x264_medium_whole",
       "kbps": 3500,
@@ -902,7 +902,7 @@
       "encoder": "h264_nvenc",
       "speed_x": 4.58,
       "wall_s": 5.64,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_whole_720p.ts",
+      "out": "work/m2/m2_nvenc_p5_whole_720p.ts",
       "size": 10949308,
       "tag": "nvenc_p5_whole",
       "kbps": 3650,
@@ -928,7 +928,7 @@
       "wall_s": 5.58,
       "speed_x": 4.305,
       "agg_speed_x": 2.345,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c2w2_720p.ts",
+      "out": "work/m2/m2_nvenc_p5_c2w2_720p.ts",
       "size": 10783304,
       "chunks": [
         {
@@ -972,7 +972,7 @@
       "wall_s": 6.03,
       "speed_x": 3.978,
       "agg_speed_x": 1.159,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c4w4_720p.ts",
+      "out": "work/m2/m2_nvenc_p5_c4w4_720p.ts",
       "size": 10940660,
       "chunks": [
         {
@@ -1030,7 +1030,7 @@
       "wall_s": 7.86,
       "speed_x": 3.053,
       "agg_speed_x": 0.418,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w8_720p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w8_720p.ts",
       "size": 10861324,
       "chunks": [
         {
@@ -1116,7 +1116,7 @@
       "wall_s": 8.22,
       "speed_x": 2.921,
       "agg_speed_x": 0.823,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p5_c8w4_720p.ts",
+      "out": "work/m2/m2_nvenc_p5_c8w4_720p.ts",
       "size": 10861324,
       "chunks": [
         {
@@ -1202,7 +1202,7 @@
       "wall_s": 7.34,
       "speed_x": 3.271,
       "agg_speed_x": 0.462,
-      "out": "T:\\resume\\media\\work\\m2\\m2_nvenc_p1_c8w8_720p.ts",
+      "out": "work/m2/m2_nvenc_p1_c8w8_720p.ts",
       "size": 11862236,
       "chunks": [
         {
