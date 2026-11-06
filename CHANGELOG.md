@@ -283,3 +283,39 @@ re-measures M2.
   the affected configs gave 0.8-1.3% spread on NVENC walls and 11.6-15.5% on
   x264 walls. That is what lets the README call the 720p 2x2 row a tie instead of
   a win or a loss.
+
+## 1.0.4 - the chunk grid is cut on whole frames, so the exact check stays exact
+
+The last open review finding asked whether the packet-count check
+(`ts.verify_concat`, which has *no* tolerance) still holds when `plan_chunks`
+falls back to a uniform grid. It did not, and measuring it found the reason.
+
+### Fixed
+- **The uniform-grid fallback cut on even seconds, not whole frames.** A source
+  with sparse keyframes (a long GOP) - or one whose keyframes trip the 2.0 skew
+  guard from 1.0.3 - gets a grid of `duration / n`. For 24 s into 7 chunks that is
+  3.4286 s, which is 102.857 frames at 30 fps. `-ss` before `-i` is an accurate
+  seek, so the only imprecision was `-t` trimming a fraction of a frame; those
+  partial frames made the concatenated run land on **723 packets instead of 720**,
+  so the exact integrity check false-failed on exactly the long-GOP sources the
+  grid fallback exists to handle. The grid is now cut on whole frame boundaries
+  (boundary i = `round(i * total_frames / n) / fps`, unrounded), which partitions
+  the frame grid exactly. Verified through the shipped path
+  (`plan_chunks` -> `chunk_args` -> `ts.concat` -> `ts.verify_concat`): a forced
+  grid now reports 720/720, `ok: true`.
+- The committed benchmark artifacts are unaffected: the 4K master carries an IDR
+  every 3 s, so its chunked rows use the keyframe path, not the grid. Only the
+  sparse-keyframe fallback changed.
+
+### Changed
+- `plan_chunks` takes an optional `fps`. When it is given the grid is frame
+  aligned; when it is omitted the old even-seconds grid is kept, so the pure
+  planner stays usable for arithmetic without a source. The encode path passes
+  `src.fps`.
+- `ts.py` now documents why the packet check has no tolerance: it is sound only
+  because every chunk spans a whole number of frames.
+
+### Added
+- `test_uniform_grid_is_frame_aligned_when_fps_given` - the regression: every grid
+  boundary is a whole frame, and the spans sum back to `round(duration * fps)`.
+- 190 tests (189 pass, 1 skips without a GPU).

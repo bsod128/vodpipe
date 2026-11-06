@@ -238,10 +238,14 @@ Five decisions I would defend in a review:
    "Nearest keyframe to the ideal cut" is not enough on its own: on the 4K master
    it planned 3/6/6/9 s for 4 chunks, and wall time is the longest chunk. A skew
    guard falls back to a uniform grid when the keyframe plan is more than 2x
-   lopsided, so the same input now gives 6/6/6/6 s.
+   lopsided, so the same input now gives 6/6/6/6 s. When the grid is used (too
+   few keyframes, or the skew guard), its cuts land on whole frames, not even
+   seconds: 24 s into 7 is 3.4286 s = 102.857 frames, and the partial-frame trims
+   overshoot the concat to 723 packets, so the exact check below false-fails.
 3. **Container duration is not trusted on concatenated TS.** Each chunk carries
    its own PCR, so ffprobe reports a duration that lies. Integrity is proven by
-   counting video packets against the expected frame count (`ts.verify_concat`).
+   counting video packets against the expected frame count (`ts.verify_concat`),
+   with no tolerance - which is only sound because chunk cuts are frame-aligned.
 4. **GPU index is never hardcoded.** The order changes with the hardware
    configuration - a hardcoded index 0 pointed at a datacenter card whose NVENC
    cannot even initialize. `gpu.pick()` ranks cards and then *probes* each with
@@ -324,7 +328,7 @@ session already saturates a card.
 ## Tests, lint, CI
 
 ```bash
-pytest -q                 # 189 tests; ffmpeg/gpu marked tests skip without hardware
+pytest -q                 # 190 tests; ffmpeg/gpu marked tests skip without hardware
 ruff check src tests
 mypy
 ```

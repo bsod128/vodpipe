@@ -54,12 +54,32 @@ def test_last_edge_is_pinned_to_duration():
 
 def test_too_few_keyframes_falls_back_to_a_uniform_grid():
     """A long-GOP master has fewer keyframes than chunks. Falling back to a grid
-    is correct because `-ss` before `-i` snaps to the nearest IDR anyway; the
+    is correct because `-ss` before `-i` is an accurate seek anyway; the
     frame-count check is what proves nothing was lost."""
     ranges = probe.plan_chunks(10.0, [0.0], 5)
     assert len(ranges) == 5
     assert ranges[0][0] == 0.0
     assert ranges[-1][1] == 10.0
+
+
+def test_uniform_grid_is_frame_aligned_when_fps_given():
+    """The integrity check demands exactly round(duration*fps) packets, so the
+    grid fallback must cut on whole frames. An even-second split of 24 s into 7 is
+    3.4286 s = 102.857 frames; measured on the real 4K master, that overshoots to
+    723 packets after concat and the check false-fails. Frame-aligned cuts land on
+    frame indices and sum exactly. (Regression: this is why plan_chunks takes fps.)
+    """
+    duration, fps, n = 24.0, 30.0, 7
+    ranges = probe.plan_chunks(duration, [0.0], n, fps=fps)
+    assert len(ranges) == n
+    assert ranges[0][0] == 0.0
+    assert ranges[-1][1] == duration
+    # Every boundary sits on a whole frame of the source grid.
+    for start, end in ranges:
+        assert abs(start * fps - round(start * fps)) < 1e-6
+        assert abs(end * fps - round(end * fps)) < 1e-6
+    # Whole-frame spans sum back to the exact frame budget.
+    assert round(sum(e - s for s, e in ranges) * fps) == round(duration * fps)
 
 
 def test_unbalanced_keyframes_fall_back_to_a_uniform_grid():

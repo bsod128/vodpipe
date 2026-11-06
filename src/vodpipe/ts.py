@@ -10,6 +10,13 @@ with `-sc_threshold 0`.
 `normalize()` then remuxes TS -> MP4 (`-c copy`) to heal the seam discontinuities
 before CMAF packaging: the muxer writes a single index over one continuous
 timeline, and the packager stops seeing "Packet corrupt" at chunk borders.
+
+The packet check has **no tolerance** on purpose - one packet short is a dropped
+frame and should fail. It is sound only because `probe.plan_chunks` makes every
+chunk span a whole number of frames: IDRs are already frame-aligned, and the
+uniform-grid fallback cuts on frame boundaries too. Cut on even seconds instead
+(3.4286 s = 102.857 frames) and the pieces overshoot the frame grid; that was a
+real bug, pinned by `test_uniform_grid_is_frame_aligned_when_fps_given`.
 """
 
 from __future__ import annotations

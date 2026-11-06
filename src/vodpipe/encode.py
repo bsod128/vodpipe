@@ -148,7 +148,7 @@ def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
     os.makedirs(chunk_dir, exist_ok=True)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
 
-    bounds = probe_mod.plan_chunks(src.duration, src.keyframes, nchunks)
+    bounds = probe_mod.plan_chunks(src.duration, src.keyframes, nchunks, fps=src.fps)
     paths = [os.path.join(chunk_dir, f"c{i:03d}.ts") for i in range(len(bounds))]
 
     run = runner or ff.Runner()

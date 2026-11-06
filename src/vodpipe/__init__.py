@@ -19,4 +19,4 @@ from .pipeline import Pipeline
 
 __all__ = ["Pipeline", "Rung"]
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"

@@ -104,18 +104,26 @@ def keyframes(path: str, runner: ff.Runner | None = None) -> list[float]:
 _MAX_CHUNK_SKEW = 2.0
 
 
-def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[float, float]]:
+def plan_chunks(duration: float, keyframes: list[float], n: int,
+                fps: float = 0.0) -> list[tuple[float, float]]:
     """Split [0, duration] into n ranges whose borders are IDR frames.
 
     Cutting mid-GOP is the classic way to get corrupt frames at chunk seams: a
     chunk that starts on a P-frame cannot be decoded on its own. So borders are
     chosen from the keyframe list. When the source has too few keyframes (a
-    long-GOP master), we fall back to a GOP-aligned uniform grid and accept that
-    chunks start at non-keyframes: ffmpeg's `-ss` before `-i` still snaps to the
-    nearest IDR, which is why the resulting total stays frame-accurate - the
-    frame count check in `vodpipe.ts.verify_concat` is what proves it.
+    long-GOP master), we fall back to a uniform grid and accept that chunks start
+    at non-keyframes: ffmpeg's `-ss` before `-i` still snaps to the nearest IDR,
+    which is why the resulting total stays frame-accurate - the frame count check
+    in `vodpipe.ts.verify_concat` is what proves it.
 
-    The same fallback also covers *unbalanced* keyframes. "Evenly spaced
+    When `fps` is given, that grid is cut on whole frame boundaries, not on even
+    seconds. This is not cosmetic: an even-second grid over 24 s into 7 chunks is
+    3.4286 s, which is 102.857 frames, so each chunk's `-t` trims a partial frame
+    and the concatenated pieces sum to 723 packets instead of 720 - the exact
+    check then false-fails on exactly the long-GOP sources the grid exists for.
+    Aligning the cuts to frames makes the pieces partition the frame grid exactly.
+
+    The grid fallback also covers *unbalanced* keyframes. "Evenly spaced
     keyframes" and "evenly sized chunks" are different things: on the 4K master
     (GOP 3 s, 24 s long) `n=4` picked borders that gave 3 s / 6 s / 6 s / 9 s
     chunks, so one chunk ran three times as long as the smallest and the rung's
@@ -129,7 +137,20 @@ def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[f
         raise ValueError("duration must be positive")
 
     def uniform() -> list[tuple[float, float]]:
-        grid = [round(i * duration / n, 4) for i in range(n + 1)]
+        total_frames = round(duration * fps) if fps > 0 else 0
+        # Frame alignment is only possible (and only matters) when there are at
+        # least n frames to cut between; with more chunks than frames a frame
+        # grid cannot give n distinct cuts, so fall back to the time grid.
+        if total_frames >= n:
+            edges = [round(i * total_frames / n) for i in range(n + 1)]
+            edges[-1] = total_frames
+            # Full precision on purpose: round(e/fps, 4) would turn 103/30 into
+            # 3.4333, which is 102.999 frames and re-opens the off-by-one the
+            # whole alignment exists to close. `-ss` takes str(start) verbatim.
+            grid = [e / fps for e in edges]
+        else:
+            grid = [round(i * duration / n, 4) for i in range(n + 1)]
+        grid[0] = 0.0
         grid[-1] = round(duration, 4)
         return _ranges(grid, n)
 
