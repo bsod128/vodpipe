@@ -34,19 +34,21 @@ def test_end_past_eof_is_clamped_not_an_error():
     assert r.end == 999
 
 
-@pytest.mark.parametrize("header", ["bytes=1000-2000", "bytes=200-100", "bytes=-0",
-                                    "bytes=", "items=0-1"])
-def test_unsatisfiable_or_unparsable_headers_raise_416(header):
+@pytest.mark.parametrize("header", ["bytes=1000-2000", "bytes=200-100", "bytes=-0"])
+def test_well_formed_but_unsatisfiable_headers_raise_416(header):
+    """416 is only for a `bytes=` range we understand and cannot serve."""
     with pytest.raises(mr.RangeNotSatisfiable):
         mr.parse_range(header, 1000)
 
 
-def test_multi_range_is_refused_instead_of_silently_partial():
-    """Serving only the first range would hand a player the wrong bytes with a
-    206. An error it can retry as a single range is better than a wrong answer."""
-    with pytest.raises(mr.RangeNotSatisfiable) as exc:
-        mr.parse_range("bytes=0-99,200-299", 1000)
-    assert "multi-range" in str(exc.value)
+@pytest.mark.parametrize("header", ["bytes=", "items=0-1", "bytes=abc-def",
+                                    "bytes=0-99,200-299", "range 0-10", ""])
+def test_ranges_we_do_not_implement_are_ignored(header):
+    """RFC 9110 14.2.4: a Range with an unsupported unit, bad syntax, or
+    multi-range we do not support must be IGNORED (serve the whole body), not
+    turned into 416. A client that sent a header we cannot honour still gets its
+    file; answering 416 would break players that send multi-range optimistically."""
+    assert mr.parse_range(header, 1000) is None
 
 
 def test_416_carries_content_range_advertisement():

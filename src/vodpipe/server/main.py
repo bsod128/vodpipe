@@ -6,7 +6,9 @@ What is designed here rather than just wired:
     cannot disagree;
   * cancellation is cooperative (a Redis flag), not SIGKILL of the worker:
     killing an NVENC session mid-chunk leaves a corrupt TS segment;
-  * byte-range serving, because players need ranges for CMAF/fMP4 and seeking.
+  * byte-range serving, because players need ranges for CMAF/fMP4 and seeking;
+  * one job-id gate shared by every job route, so a path or a Redis key never
+    sees an id this service did not issue.
 """
 
 from __future__ import annotations
@@ -14,26 +16,60 @@ from __future__ import annotations
 import contextlib
 import os
 import uuid
+from collections.abc import Iterator
 
 import uvicorn
 from celery.result import AsyncResult
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 
-from ..jobs import CANCEL_TTL_S, cancel_key, redact_url, resolve_source, snapshot
-from ..mediarange import RangeNotSatisfiable, is_inside, media_type, parse_range
+from ..jobs import (
+    CANCEL_TTL_S,
+    cancel_key,
+    job_dir,
+    redact_url,
+    resolve_source,
+    snapshot,
+    validate_job_id,
+)
+from ..mediarange import ByteRange, RangeNotSatisfiable, is_inside, media_type, parse_range
 from . import settings, tasks
 from .models import HealthOut, JobIn, JobOut
 
 app = FastAPI(
     title="vodpipe",
     description="VOD transcoding: NVENC ladder, CMAF HLS/DASH, watermarking, VMAF.",
-    version="1.0.0",
+    version="1.0.2",
 )
 
 # The Redis client factory lives with the worker (tasks.state_client); the API
 # reuses it so the connection settings and the lazy import exist once.
 _state = tasks.state_client
+
+#: Read size for range delivery. A player asks for `bytes=0-` of a segment as a
+#: rule, so ranges are streamed in chunks rather than read into one buffer.
+RANGE_CHUNK_BYTES = 1 << 20
+
+
+def iter_range(path: str, byte_range: ByteRange) -> Iterator[bytes]:
+    """Yield one byte range of a file in bounded chunks.
+
+    Deliberately not `read(length)`: `bytes=0-` is the most common first request
+    a player sends, so buffering the answer puts an arbitrarily large segment in
+    the API process on every open. Starlette's FileResponse can stream ranges
+    itself, but it 400s on a header it cannot parse and we ignore those instead
+    (see `mediarange.parse_range`), so the range we resolved ourselves has to be
+    streamed by us.
+    """
+    left = byte_range.length
+    with open(path, "rb") as handle:
+        handle.seek(byte_range.start)
+        while left > 0:
+            block = handle.read(min(RANGE_CHUNK_BYTES, left))
+            if not block:
+                break
+            left -= len(block)
+            yield block
 
 
 # --------------------------------------------------------------------- health
@@ -112,9 +148,21 @@ def _snapshot(job_id: str) -> JobOut:
     return JobOut(job_id=job_id, **view)
 
 
+def _checked(job_id: str) -> str:
+    """Route guard: an id this service never issued is a 404, not a backend probe.
+
+    Cheap enough to run on every job route, so the rule cannot drift when a new
+    route is added.
+    """
+    try:
+        return validate_job_id(job_id)
+    except ValueError as exc:
+        raise HTTPException(404, "no such job") from exc
+
+
 @app.get("/jobs/{job_id}", response_model=JobOut)
 def status(job_id: str):
-    return _snapshot(job_id)
+    return _snapshot(_checked(job_id))
 
 
 @app.post("/jobs/{job_id}/cancel", response_model=JobOut)
@@ -126,6 +174,7 @@ def cancel(job_id: str):
     finished successfully. The TTL means a stale flag can never cancel a later
     job that happens to reuse an id.
     """
+    job_id = _checked(job_id)
     with contextlib.suppress(Exception):
         # If the backend is down the job simply runs to completion; the client
         # can retry. Failing the request would be worse than a no-op cancel.
@@ -138,7 +187,10 @@ def cancel(job_id: str):
 # route here, change those too.
 @app.get("/jobs/{job_id}/report")
 def job_report(job_id: str):
-    path = os.path.join(settings.WORK_ROOT, job_id, "report.json")
+    try:
+        path = os.path.join(job_dir(job_id, settings.WORK_ROOT), "report.json")
+    except ValueError as exc:
+        raise HTTPException(404, "no report yet") from exc
     if not os.path.isfile(path):
         raise HTTPException(404, "no report yet")
     return FileResponse(path, media_type="application/json", filename=f"{job_id}.json")
@@ -151,10 +203,14 @@ def job_report(job_id: str):
 def serve(job_id: str, rest: str, request: Request):
     """Serve manifests and segments, with byte-range support for seeking.
 
-    Both the job directory and the resolved file are checked against their
-    roots: `..` in the URL must not reach outside the job's own output.
+    Two untrusted path inputs meet here, so they are checked separately: the id
+    must be one this service issued (`jobs.job_dir`, which also pins the job
+    directory inside `OUT_ROOT`), and `rest` must stay inside that directory.
     """
-    base = os.path.normpath(os.path.join(settings.OUT_ROOT, job_id))
+    try:
+        base = job_dir(job_id, settings.OUT_ROOT)
+    except ValueError as exc:
+        raise HTTPException(404, "not found") from exc
     path = os.path.normpath(os.path.join(base, rest))
     if not is_inside(path, base) or not os.path.isfile(path):
         raise HTTPException(404, "not found")
@@ -164,17 +220,14 @@ def serve(job_id: str, rest: str, request: Request):
         byte_range = parse_range(request.headers.get("range"), size)
     except RangeNotSatisfiable as exc:
         return JSONResponse({"detail": "range not satisfiable"}, status_code=416,
-                            headers={"content-range": f"bytes */{size}", **exc.headers})
+                            headers=exc.headers)
 
     if byte_range is None:
         return FileResponse(path, media_type=media_type(path),
                             headers={"accept-ranges": "bytes"})
-
-    with open(path, "rb") as handle:
-        handle.seek(byte_range.start)
-        body = handle.read(byte_range.length)
-    return Response(content=body, status_code=206, media_type=media_type(path),
-                    headers=byte_range.content_headers())
+    return StreamingResponse(iter_range(path, byte_range), status_code=206,
+                             media_type=media_type(path),
+                             headers=byte_range.content_headers())
 
 
 if __name__ == "__main__":

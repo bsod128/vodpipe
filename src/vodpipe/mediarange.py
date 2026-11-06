@@ -5,7 +5,9 @@ the user scrubs, and it needs the right Content-Type or it refuses to parse the
 playlist. Both behaviours are protocol-level and easy to get subtly wrong, so
 they live here as pure functions with tests rather than inline in a route.
 
-Follows RFC 7233 single-range semantics.
+Follows RFC 9110 section 14.2 (Range) single-range semantics: a range whose unit
+we do not implement, or which we cannot parse, is ignored (the whole body is
+served); 416 is reserved for a well-formed `bytes=` range that cannot be satisfied.
 """
 
 from __future__ import annotations
@@ -71,23 +73,34 @@ class RangeNotSatisfiable(Exception):
 def parse_range(header: str | None, total: int) -> ByteRange | None:
     """`Range` header -> resolved byte range, or None for a full read.
 
-    Cases that matter for players:
-      * `bytes=0-`          - whole file (the common first request);
-      * `bytes=1000-`       - resume from an offset;
-      * `bytes=-500`        - suffix range: the LAST 500 bytes;
-      * `bytes=0-99,200-299`- multi-range: not supported, answered as 416 rather
-        than silently serving the first range (a wrong answer is worse than an
-        error the client will retry as a single range).
+    Player-shaped cases:
+      * `bytes=0-`     - whole file (the common first request);
+      * `bytes=1000-`  - resume from an offset;
+      * `bytes=-500`   - suffix range: the LAST 500 bytes.
+
+    What we do with anything else is decided by RFC 9110, which is stricter than
+    intuition. "A server MAY ignore the Range header field" (14.2), and
+    "An origin server MUST ignore a Range header field that contains a range unit
+    it does not understand" (14.2.1), while an invalid ranges-specifier is
+    "MAY ignore or reject" (14.2.2). 416 is reserved for a *valid* `bytes=`
+    specifier that cannot be satisfied. So:
+      * `items=0-1`, `bytes=abc-def`, multi-range -> None: ignore, answer 200.
+        Starlette's own FileResponse answers these with 400 text/plain; that is a
+        defensible reading of "MAY reject", but "MUST ignore" for an unknown unit
+        is the stronger rule, so we parse here instead of delegating.
+      * `bytes=5000-` against a 1 kB file -> RangeNotSatisfiable -> 416.
     """
     if not header:
         return None
     header = header.strip()
     if "," in header:
-        raise RangeNotSatisfiable(total, "multi-range requests are not supported")
+        return None
 
     m = _RANGE_RE.match(header)
-    if not m or total <= 0:
-        raise RangeNotSatisfiable(total, f"unparsable range: {header!r}")
+    if not m:
+        return None
+    if total <= 0:
+        raise RangeNotSatisfiable(total, "empty file")
     raw_start, raw_end = m.group(1), m.group(2)
 
     if not raw_start and not raw_end:

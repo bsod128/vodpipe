@@ -212,8 +212,8 @@ and that assumption is exactly what used to be wrong.
 | `watermark.py` | filter fragments and the escaping they need |
 | `gpu.py` | card discovery and an actual NVENC probe per card |
 | `pipeline.py` | orchestration, progress and cancellation hooks |
-| `jobs.py` | queue state semantics, stdlib only |
-| `mediarange.py` | RFC 7233 ranges and media MIME types |
+| `jobs.py` | queue state semantics, the job-id trust boundary |
+| `mediarange.py` | RFC 9110 ranges and media MIME types |
 | `server/` | FastAPI intake, Celery worker, byte-range delivery |
 
 Five decisions I would defend in a review:
@@ -245,6 +245,22 @@ Bugs the tests caught, worth naming because they were silent:
 * `expected_video_frames` was called through the wrong module, raising
   `AttributeError` on the live path after every ladder.
 
+And one the tests did *not* catch, which a review round did - because the earlier
+round had declined the same finding on a weaker probe:
+
+* **path traversal through a job id.** `/media/{job_id}/{rest}` joined the id into a
+  path and then checked containment. A probe with `../` and `..%2f` 404s, so the
+  route looked sealed. `%2e%2e` and `%5c` do not: the framework hands the handler the
+  already-decoded segment, so `..` and a backslash arrive assembled, and `os.path.join`
+  walks out of the root *before* the containment check runs. The check then made it
+  worse: an absolute segment (`C:` + `\`) makes the candidate equal to the base, so
+  "is this inside itself" is true for every file on the machine. It served a file from
+  above the jobs root, and `C:\Windows\win.ini` with a `206`. The fix is not a stricter
+  containment check but a validated id at the boundary (`^[0-9a-f]{12}\Z`, the shape
+  `uuid4().hex[:12]` makes), with containment re-checked against the *root* - never
+  against a value derived from the input being checked. One shared route guard, so a
+  new route cannot forget it.
+
 ## Quality measurement
 
 VMAF compares the **distorted rendition upscaled to the reference size** against
@@ -267,7 +283,12 @@ mean hides exactly the frames that make a viewer quit.
 | `GET /jobs/{id}` | state, progress, per-rung rows, artifacts |
 | `POST /jobs/{id}/cancel` | cooperative cancel at the next rung boundary |
 | `GET /jobs/{id}/report` | the run's JSON report |
-| `GET /media/{job}/{path}` | manifests and segments, byte-range support |
+| `GET /media/{job}/{path}` | manifests and segments, streamed byte ranges |
+
+Job ids are validated at the route (`^[0-9a-f]{12}\Z`) before they reach a path or a
+Redis key, and every job route shares that one guard. A `Range` header this server
+cannot parse is ignored and the whole body is served with `200`; `416` is reserved
+for a well-formed `bytes=` range past the end - the split RFC 9110 14.2 defines.
 
 Queue depth is read with `queue_declare` straight from AMQP - declaring is
 idempotent, so this needs no management API and no extra credentials.
@@ -289,7 +310,7 @@ session already saturates a card.
 ## Tests, lint, CI
 
 ```bash
-pytest -q                 # 171 tests; ffmpeg/gpu marked tests skip without hardware
+pytest -q                 # 186 tests; ffmpeg/gpu marked tests skip without hardware
 ruff check src tests
 mypy
 ```

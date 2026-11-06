@@ -22,6 +22,7 @@ testclient = pytest.importorskip("fastapi.testclient")
 
 from pydantic import ValidationError  # noqa: E402
 
+from vodpipe import mediarange as mr  # noqa: E402
 from vodpipe import report  # noqa: E402
 from vodpipe.server import main, settings, tasks  # noqa: E402
 from vodpipe.server.models import JobIn, WatermarkIn  # noqa: E402
@@ -98,6 +99,114 @@ def test_api_and_worker_share_one_state_client():
     """Progress and cancellation go through a single client factory, or the API
     and the worker can end up pointing at different Redis instances."""
     assert main._state is tasks.state_client
+
+
+# ------------------------------------------------- path containment (security)
+
+GOOD_ID = "a1b2c3d4e5f6"
+BAD_IDS = ["..", "%2e%2e", "%2E%2E", "a" * 11 + "z", "A1B2C3D4E5F6",
+           "a1b2c3d4e5f6x", "j1"]
+
+
+@pytest.fixture
+def job_tree(tmp_path, monkeypatch):
+    """A real one-job tree under roots we control, so 404 vs 200 is meaningful.
+
+    A route that answered 404 to *everything* would pass a traversal test that
+    only asserts 404, so every case below is paired with a request that must
+    still succeed.
+    """
+    out_root = tmp_path / "out"
+    work_root = tmp_path / "work"
+    (out_root / GOOD_ID / "hls").mkdir(parents=True)
+    (work_root / GOOD_ID).mkdir(parents=True)
+    (out_root / GOOD_ID / "hls" / "seg_00001.m4s").write_bytes(b"A" * 2048)
+    (work_root / GOOD_ID / "report.json").write_text('{"ok": true}', encoding="utf-8")
+    # Canary outside both roots: reachable only by escaping.
+    (tmp_path / "outside.ts").write_bytes(b"B" * 64)
+    (tmp_path / "outside_report.json").write_text('{"leak": true}', encoding="utf-8")
+    monkeypatch.setattr(settings, "OUT_ROOT", str(out_root))
+    monkeypatch.setattr(settings, "WORK_ROOT", str(work_root))
+    return {"out": out_root, "work": work_root, "tmp": tmp_path}
+
+
+def test_legit_media_and_report_are_served(job_tree):
+    """The positive control for every traversal assertion below."""
+    client = testclient.TestClient(main.app)
+    ok = client.get(f"/media/{GOOD_ID}/hls/seg_00001.m4s")
+    assert ok.status_code == 200, ok.status_code
+    assert ok.headers["accept-ranges"] == "bytes"
+    assert ok.headers["content-type"] == "video/iso.segment"
+    part = client.get(f"/media/{GOOD_ID}/hls/seg_00001.m4s",
+                      headers={"range": "bytes=0-99"})
+    assert part.status_code == 206
+    assert part.headers["content-range"] == "bytes 0-99/2048"
+    rep = client.get(f"/jobs/{GOOD_ID}/report")
+    assert rep.status_code == 200 and rep.json() == {"ok": True}
+
+
+def test_media_route_cannot_escape_its_job_directory(job_tree):
+    """The bug: Starlette decodes `%2e%2e` and `%5c` *before* the handler sees
+    them, so `os.path.join` walked out of OUT_ROOT; and an absolute segment
+    (`C:` + backslash) made base == candidate, which made the self-referential
+    `is_inside(path, base)` trivially true. `/media/%2e%2e/outside.ts` used to
+    return 200 with a file from above the root."""
+    client = testclient.TestClient(main.app)
+    vectors = [
+        "/media/%2e%2e/outside.ts",
+        "/media/%2E%2E/outside.ts",
+        "/media/%2e%2e%5coutside.ts",
+        f"/media/{GOOD_ID}/hls/../../outside.ts",
+        f"/media/{GOOD_ID}/hls/%2e%2e/outside.ts",
+        f"/media/{GOOD_ID}%5c..%5coutside.ts",
+        f"/media/{GOOD_ID}/../outside.ts",
+        "/media/C%3a%5coutside.ts",
+    ]
+    for url in vectors:
+        r = client.get(url)
+        assert r.status_code == 404, (url, r.status_code, r.text[:60])
+
+
+@pytest.mark.parametrize("bad_id", BAD_IDS)
+def test_malformed_job_ids_are_404_not_a_backend_probe(bad_id, job_tree):
+    """Ids this service never issued are rejected at the boundary, before the id
+    reaches a filesystem path or a Redis key."""
+    client = testclient.TestClient(main.app)
+    assert client.get(f"/media/{bad_id}/hls/seg_00001.m4s").status_code == 404
+    assert client.get(f"/jobs/{bad_id}/report").status_code == 404
+
+
+def test_report_route_cannot_escape_its_work_root(job_tree):
+    """`/jobs/<id>/report` had no containment check at all: any directory under
+    the parent of WORK_ROOT containing a `report.json` was readable."""
+    client = testclient.TestClient(main.app)
+    for url in ["/jobs/%2e%2e/report", "/jobs/%2e%2e%5creport", "/jobs/%2E%2E/report"]:
+        assert client.get(url).status_code == 404, url
+    assert client.get(f"/jobs/{GOOD_ID}/report").status_code == 200
+
+
+def test_iter_range_reads_in_bounded_chunks(tmp_path, monkeypatch):
+    """`bytes=0-` is the most common first request a player sends and its length is
+    attacker-shaped, so range delivery must not read the whole answer into one
+    buffer. Chunk size is capped and the bytes stay byte-exact."""
+    monkeypatch.setattr(main, "RANGE_CHUNK_BYTES", 4096)
+    seg = tmp_path / "seg.m4s"
+    seg.write_bytes(bytes(range(256)) * 40)  # 10240 bytes
+    br = mr.parse_range("bytes=1000-", seg.stat().st_size)
+    chunks = list(main.iter_range(str(seg), br))
+    assert b"".join(chunks) == seg.read_bytes()[1000:]
+    assert max(len(c) for c in chunks) <= main.RANGE_CHUNK_BYTES
+    assert len(chunks) > 1  # chunked, not one big read
+
+
+def test_failure_payload_is_scrubbed_of_host_paths():
+    """The worker's exception text quotes absolute paths; /jobs/{id} returns it
+    verbatim, so it must go through the same scrubber as committed reports."""
+    from vodpipe import ff, jobs
+
+    view = jobs.snapshot("FAILURE", ValueError(r"T:\resume\media\work\jobs\x\y.ts failed"))
+    assert "resume" not in view["error"]
+    assert ff.LOCAL_PATH in view["error"]
 
 
 def test_health_reports_dependencies_without_leaking_credentials(monkeypatch):

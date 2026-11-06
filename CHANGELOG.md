@@ -117,10 +117,86 @@ code, duplication, or suggestions deliberately declined (noted at the bottom).
   feed). Previously only the cancelled case had a committed artifact.
 
 ### Review suggestions deliberately declined
-- Path traversal on `/media/{job_id}/{rest}` and `/jobs/{job_id}/report`: probed
+- ~~Path traversal on `/media/{job_id}/{rest}` and `/jobs/{job_id}/report`: probed
   with `..%2f` and every variant 404s; `mediarange.is_inside`,
-  `jobs.resolve_source` and `packager.safe_label` already do the containment.
+  `jobs.resolve_source` and `packager.safe_label` already do the containment.~~
+  **This call was wrong and 1.0.2 reverses it.** The probe only used the
+  percent-encoding of a slash; the encoding of the dot does get through.
 - Renaming report schema keys - they are pinned by the committed artifacts and
   by `figures.py`, and the report is the project's public output.
 - The deliberate `*_args` duplication of a few option strings: it is the
   decide/do split the whole test suite is built on.
+
+## 1.0.2 - the path-traversal finding we had declined
+
+A second review round reported a path traversal on the two routes that put a
+client-supplied id into a filesystem path. It reproduced on the first try, and it
+served files that live outside every root the service knows about.
+
+The decline in 1.0.1 was not lazy, it was under-tested: it probed `..%2f` and
+`../`, both of which Starlette rejects while routing, so the routes looked sealed.
+`%2e%2e` and `%5c` are not rejected - Starlette hands the handler the *decoded*
+segment, so `..` and a backslash arrive already assembled. `os.path.join(OUT_ROOT,
+job_id)` then walks out of the root before any containment check runs, and a second
+flaw completes the job: an absolute segment (`C:` + `\`) makes the candidate and
+the base the same path, so `is_inside(path, base)` - the check that was supposed to
+catch this - is satisfied by *any* file on the machine, because every path is
+inside itself.
+
+What the shipped code served before this release, from the in-process test client:
+
+- `/media/%2e%2e/leak_canary.ts` -> `200`, a file one level above the jobs root
+- `/media/C%3a%5cWindows%5cwin.ini` -> `206`, `C:\Windows\win.ini`
+
+The `206` is the part that makes it a streaming media route rather than a static
+one: the range parser happily computed an end past EOF and answered with the first
+`total` bytes of a file it was never pointed at.
+
+### Fixed
+- **Path traversal on `/media/{job_id}/{rest}` and `/jobs/{job_id}/report`.** The
+  trust boundary moved to where the id enters the process: `jobs.validate_job_id()`
+  accepts only `^[0-9a-f]{12}\Z`, the shape `uuid4().hex[:12]` produces, and
+  `jobs.job_dir()` composes it with containment re-checked against the **root** -
+  never against a value derived from the same untrusted input. Every job route
+  shares one `_checked()` guard, so the rule cannot drift when a route is added.
+  Containment checks were not the answer here and the docstring now says so: the
+  id is validated, and `is_inside` stays as defence in depth (`mediarange.is_inside`
+  itself was correct all along, including the cross-drive `ValueError` on Windows).
+- **`/jobs/{id}` echoed the worker's exception text unredacted.** `FAILURE` payloads
+  quote absolute host paths and sometimes the broker URL, and the endpoint returns
+  them verbatim to anyone polling the id. `jobs.snapshot()` now runs that string
+  through the same `ff.scrub()` the committed reports use.
+- **Range semantics did not match the RFC we cited.** The module docstring pointed
+  at RFC 7233; the rules actually needed are RFC 9110 section 14.2, and they were
+  applied backwards in one place: an unparsable or unsupported range (an unknown
+  unit, `items=0-1`, `bytes=abc-def`, a multi-range) is a header we are allowed to
+  ignore - `An origin server MUST ignore a Range header field that contains a range
+  unit it does not understand` - so it now serves the whole body with `200`. `416`
+  is reserved for a *well-formed* `bytes=` range that cannot be satisfied. The
+  wording was taken from the specification text, not from a summary of it.
+- **Range delivery buffered the answer in the API process.** `bytes=0-` is the
+  first request a player makes and its length is attacker-shaped, so `read(length)`
+  put whole segments in memory on every open. `iter_range()` streams it in 1 MiB
+  chunks. `FileResponse` was considered and rejected: it streams ranges well, but it
+  answers `400` to a header it cannot parse, which would silently undo the lenient
+  policy above - so the range this project resolves itself is now streamed by
+  this project. Byte-exactness is tested against a real 3.7 MB segment.
+
+### Added
+- 21 tests for the above, replacing 6 that encoded the wrong Range contract
+  (171 -> 186): a positive control that legitimate media and reports are still
+  served (a security suite without one proves nothing), eight traversal vectors
+  through `/media`, seven malformed ids reaching `/jobs/{id}` and
+  `/jobs/{id}/cancel`, `/jobs/%2e%2e/report`, chunk-bounded range reads, and a
+  scrubbed `FAILURE` payload.
+- `jobs.JOB_ID_RE` / `validate_job_id()` / `job_dir()`: the id trust boundary has
+  one owner shared by the API and the worker.
+
+### Notes on method
+- The traversal claim was verified by serving a file above the root and
+  `C:\Windows\win.ini` from the app under test, and the fix was verified the same
+  way: all nine vectors are now `404`. Reproducing a finding before fixing it is
+  the rule; this release exists because the earlier round applied it to everything
+  *except* the finding it declined.
+- Version numbers are now consistent: `pyproject.toml` said 1.0.0 while
+  `vodpipe.__version__` said 1.0.1.
