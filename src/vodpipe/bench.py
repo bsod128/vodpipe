@@ -19,6 +19,7 @@ different target bitrate is marketing, not data.
 from __future__ import annotations
 
 import os
+import shutil
 import time
 from dataclasses import dataclass
 
@@ -101,8 +102,6 @@ def run_matrix(src: probe.Source, work: str, sel: Selection, do_vmaf: bool = Fal
                     out, ts.expected_video_frames(src.duration, r["out_fps"]), runner=run)
                 r["concat_ok"] = check["ok"]
                 r["vpkts"] = check["vpkts"]
-                import shutil
-
                 shutil.rmtree(chunk_dir, ignore_errors=True)
 
             r["tag"] = tag

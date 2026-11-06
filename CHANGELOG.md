@@ -36,8 +36,8 @@ artifact.
 ### Measured
 - Ladder of 5 rungs on 4K: 82.6 s wall chunked (63.4 s whole-file), VMAF 94.88 (2160p)
   to 59.63 (432p) on the chunked run.
-- NVENC vs x264-medium: only 1.3-1.7x on this GPU, not the 10x folklore.
-- Chunking on one GPU is strictly worse (2160p: 29.8 s whole, 35.3 s at 8x8) -
+- NVENC vs x264-medium: only 1.4-1.7x on this GPU, not the 10x folklore.
+- Chunking on one GPU gives no real speedup (2160p: 29.6 s whole, 36.3 s at 8x8) -
   the GPU is already saturated by one encode.
 - Fused watermark: within measurement noise (every variant inside the baseline's
   own 2.9% spread), i.e. not measurably slower.
@@ -200,3 +200,86 @@ one: the range parser happily computed an end past EOF and answered with the fir
   *except* the finding it declined.
 - Version numbers are now consistent: `pyproject.toml` said 1.0.0 while
   `vodpipe.__version__` said 1.0.1.
+
+## 1.0.3 - review round two, and a planner bug the benchmark exposed
+
+A second review pass over the same tree, run after the security round so it could
+not collide with it. It found no new security defect but nine hygiene problems,
+and chasing one of them into `plan_chunks()` found a real bug in the parallel
+planner - which then invalidated a committed benchmark artifact, so this release
+re-measures M2.
+
+### Fixed
+- **A typo'd `--rungs` exited 0 without encoding anything.** `ladder.select()`
+  ignored unknown labels, so `vodpipe ladder --rungs 2106p` "succeeded" with an
+  empty ladder. Selection is now strict: an unknown label is an error and the CLI
+  returns 2.
+- **`plan_chunks()` could plan a 3x unbalanced split.** On the committed 4K
+  master (24 s, GOP 3 s), `n=4` produced chunks of 3/6/6/9 s: the greedy
+  "nearest keyframe to the ideal cut" rule has no balance guard, so the first
+  bucket absorbed the only keyframe at 3 s and the last bucket ran to the end.
+  Wall time is the longest chunk, so `c4w4` wasted workers. A skew guard
+  (`_MAX_CHUNK_SKEW = 2.0`) falls back to a uniform grid when the keyframe plan is
+  more than 2x lopsided; the same input now yields 6/6/6/6 s. Cut points stay on
+  IDR frames only - the guard changes *which* balanced plan is chosen, not the
+  rule.
+- **`cmd_job` could poll forever.** The client printed progress with its own
+  sleep loop and had no exit condition when a worker died. It now uses
+  `Client.wait()` with `--timeout` (default 1800 s).
+- **`--source` defaulted to a file that does not exist** in a fresh checkout.
+  Corrected to the generated `src_clip/4k_master.mp4`.
+- **The queued path ran no integrity check.** The CLI verified frame counts on
+  concatenated rungs; the worker did not, so a truncated ladder could report
+  `SUCCESS`. `pipeline.verify()` is now called in the task and the verdict ships
+  in the report under `verify`.
+- Core-only test run failed without Celery installed: one test imported
+  `vodpipe.server.tasks` unconditionally. Now `pytest.importorskip("celery")`.
+
+### Changed
+- `bench/m2_bench.json` regenerated, because the committed artifact had measured
+  the unbalanced planner. The headline conclusions did not change; three numbers
+  and one claim did:
+  - 2160p chunking: 29.6 s whole, 30.7 (2x2), 32.4 (4x4), 36.3 (8x8). The old
+    artifact said 29.8 / 30.1 / 31.5 / 35.3.
+  - NVENC vs x264-medium: 1.45x / 1.72x / 1.58x (was 1.58x / 1.74x / 1.64x);
+    x264 walls scatter up to 15.5% run-to-run because they are CPU-bound, so
+    these are read as "about 1.5x", not to two decimals.
+  - The README used to say chunking "never wins, at any rung". That is too
+    strong. At 720p, 2x2 is 5.72-5.86 s vs whole-file 5.86-6.08 s across three
+    repeats - a 1-3% edge against a 3.8% run-to-run spread. It is a tie, not a
+    win, and it reverses as workers increase. The README and the interview pack
+    now say that.
+  - `c4w4` at 2160p is the row the planner fix actually changed: per-chunk walls
+    went from 29.7/29.6/18.8/31.3 s to 32.2/32.2/32.2/32.2 s. Wall got 2.9%
+    *worse* (31.45 -> 32.36 s) because balance removed a lucky tail: the old
+    plan's short chunk finished early and hid nothing. The honest number is the
+    slower one.
+- Worker logs go through `logging.getLogger("vodpipe.worker")` instead of
+  `print()`, which is what makes them land in the Celery log.
+- Report construction extracted into `tasks.build_payload()` so the report schema
+  is testable without running an encode.
+
+### Removed
+- Dead public API that no caller, test or doc used: `JobCancelled`,
+  `encode.on_chunk_done`, `ff.run`, `Rung.as_dict`, `Source.as_dict`, and the
+  `pipeline.do_bitrates` / `expect_frames` parameters (the bitrate probe is
+  unconditional and the frame expectation is derived, so both were knobs that
+  only mislead if turned).
+
+### Added
+- `test_probe_chunks`: balance guard tests (unbalanced keyframes fall back to the
+  grid; balanced keyframes are still used for cut points).
+- `test_jobs`: a report-contract test pinning `verify` and the path-scrubbing of
+  the payload the client and status page render.
+- 189 tests total (188 pass, 1 skips without a GPU). Core-only run (no
+  FastAPI/Celery/Redis installed): 156 passed, 4 skipped.
+
+### Notes on method
+- The M2 re-measurement was worth doing even though nothing "broke": a committed
+  artifact is a claim, and after the planner fix the old one described a design
+  the shipped code no longer produces. Its pre-fix copy is kept out of the tree
+  for comparison.
+- Run-to-run noise is now measured rather than asserted: three full repeats of
+  the affected configs gave 0.8-1.3% spread on NVENC walls and 11.6-15.5% on
+  x264 walls. That is what lets the README call the 720p 2x2 row a tie instead of
+  a win or a loss.

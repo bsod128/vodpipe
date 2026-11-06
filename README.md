@@ -23,8 +23,8 @@ answers contradicted what I had read on the internet:
 
 | Claim often repeated | What I measured (RTX 3060, ffmpeg 7.1) |
 |---|---|
-| NVENC is ~10x faster than x264 | **1.3-1.7x** on these rungs. At 2160p NVENC is only 0.82x realtime |
-| Split the file, encode in parallel, get a speedup | On one GPU it is **strictly worse**: 2160p 29.8 s whole, 35.3 s at 8x8 |
+| NVENC is ~10x faster than x264 | **1.4-1.7x** on these rungs. At 2160p NVENC is only 0.82x realtime |
+| Split the file, encode in parallel, get a speedup | On one GPU it is **never a real win**: 2160p 29.6 s whole, 36.3 s at 8x8; 2x2 ties whole inside noise at 1080p/720p |
 | Watermarking costs CPU time you should budget for | Fused into the encode pass it is **free**: every variant lands inside the baseline's own 2.9% run-to-run spread. A separate pass costs **+103.9%** |
 
 The reason parallel chunking fails is that the NVENC block is a fixed unit on the
@@ -103,14 +103,24 @@ chunked with 2x2 / 4x4 / 8x8 workers:
 
 | Rung | x264 medium | NVENC whole | 2x2 | 4x4 | 8x8 |
 |---|---|---|---|---|---|
-| 2160p | 47.1 s (0.52x) | **29.8 s (0.82x)** | 30.1 | 31.5 | 35.3 |
-| 1080p | 15.9 s (1.54x) | **9.1 s (2.75x)** | 9.2 | 9.6 | 11.7 |
-| 720p | 9.3 s (2.66x) | **5.6 s (4.58x)** | 5.6 | 6.0 | 7.9 |
+| 2160p | 42.9 s (0.57x) | **29.6 s (0.82x)** | 30.7 | 32.4 | 36.3 |
+| 1080p | 16.4 s (1.49x) | 9.5 s (2.63x) | **9.4** | 10.1 | 12.1 |
+| 720p | 10.8 s (2.28x) | 6.8 s (3.98x) | **5.9** | 6.2 | 8.0 |
 
-Chunking never wins on one card, at any rung. The per-process throughput does go
-up, which is why a benchmark that reports only "speed" would have called it a
-win: the code reports `wall_s` and `agg_speed_x` separately, because wall time is
-what a user waits for.
+Chunking does not give a meaningful speedup on one card. At 2160p it only costs
+time (+3.9% at 2x2, up to +23% at 8x8). At 1080p and 720p the 2x2 row lands
+inside measurement noise of whole-file (a 3-repeat run put whole at 5.86-6.08 s
+and 2x2 at 5.72-5.86 s at 720p - a 1-3% edge, under the 3.8% run-to-run spread),
+so at most a rounding-error win, and it reverses as workers increase. The
+per-process throughput does go up, which is why a benchmark that reports only
+"speed" would have called it a win: the code reports `wall_s` and `agg_speed_x`
+separately, because wall time is what a user waits for.
+
+That noise is measured, not assumed. NVENC wall times repeat to 0.8-1.3% across
+runs; x264 scatters up to 15.5% (it is CPU-bound, and the machine is not
+idle). So every NVENC-vs-NVENC comparison below ~4% is read as a tie, and this
+table is a single run, not an average - quoting it to one decimal is the honest
+limit of what one machine can claim.
 
 Artifact: [`bench/m2_bench.json`](bench).
 
@@ -225,6 +235,10 @@ Five decisions I would defend in a review:
 2. **Chunk boundaries are IDR frames only.** Cutting mid-GOP produces a chunk
    whose first frame references frames that do not exist. `plan_chunks()` chooses
    from the keyframe list, and a test asserts contiguity and exact coverage.
+   "Nearest keyframe to the ideal cut" is not enough on its own: on the 4K master
+   it planned 3/6/6/9 s for 4 chunks, and wall time is the longest chunk. A skew
+   guard falls back to a uniform grid when the keyframe plan is more than 2x
+   lopsided, so the same input now gives 6/6/6/6 s.
 3. **Container duration is not trusted on concatenated TS.** Each chunk carries
    its own PCR, so ffprobe reports a duration that lies. Integrity is proven by
    counting video packets against the expected frame count (`ts.verify_concat`).
@@ -310,7 +324,7 @@ session already saturates a card.
 ## Tests, lint, CI
 
 ```bash
-pytest -q                 # 186 tests; ffmpeg/gpu marked tests skip without hardware
+pytest -q                 # 189 tests; ffmpeg/gpu marked tests skip without hardware
 ruff check src tests
 mypy
 ```

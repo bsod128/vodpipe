@@ -156,11 +156,10 @@ class Runner:
 # Historical name kept short: the whole codebase raises/quotes FFError.
 FFError = FFmpegError
 
+# The one Runner every module without an injected runner falls back to. Kept
+# as a Runner and not re-exported as a bare `run()`: the decide/do split means
+# callers should be able to say which runner executed what.
 _DEFAULT = Runner()
-
-
-def run(argv: Sequence[str], check: bool = True) -> Result:
-    return _DEFAULT.run(argv, check=check)
 
 
 # --------------------------------------------------------------------------

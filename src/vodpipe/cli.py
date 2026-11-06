@@ -27,7 +27,8 @@ from . import bench as bench_mod
 from . import ff, figures, gpu, probe, report, sample
 from . import pipeline as pl
 from .encoders import BACKENDS
-from .ladder import ladder, validate
+from .ladder import select as select_rungs
+from .ladder import validate
 from .watermark import is_safe_id
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -103,7 +104,13 @@ def cmd_demo(args: argparse.Namespace) -> int:
             print("NVENC unavailable here; rerun with --encoder libx264")
             return 1
 
-    rungs = [r for r in ladder() if r.label in args.rungs.split(",")]
+    # strict=True: `--rungs 2160p,480p` used to drop the unknown label silently
+    # and encode the rest, so the run looked fine and measured something else.
+    try:
+        rungs = select_rungs(args.rungs.split(","))
+    except ValueError as exc:
+        print(exc)
+        return 2
     problems = validate(rungs)
     if problems:
         print("ladder rejected:")
@@ -315,17 +322,14 @@ def cmd_job(args: argparse.Namespace) -> int:
         return 1
     jid = job["job_id"]
     print("job:", jid)
-    seen = None
     cancelled = False
-    while True:
-        st = c.status(jid)
+
+    def show(st: dict) -> None:
+        nonlocal cancelled
         # `stage` is present but null before the worker starts, so a default of
         # "" in get() does not help: only None means "unknown".
         stage = st.get("stage") or ""
-        sig = (st.get("state"), stage)
-        if sig != seen:
-            seen = sig
-            print(f"  {st.get('state')} p={st.get('progress')}: {stage or '-'}")
+        print(f"  {st.get('state')} p={st.get('progress')}: {stage or '-'}")
         # Fire once. The worker clears the flag semantics only between rungs, so
         # re-issuing cancel on every poll is noise (and would mask a resume).
         if not cancelled and args.cancel_at and stage.startswith("encode") \
@@ -333,10 +337,17 @@ def cmd_job(args: argparse.Namespace) -> int:
             print(f"  -> cancel at {stage}")
             c.cancel(jid)
             cancelled = True
-        if st.get("state") in ("SUCCESS", "CANCELLED", "FAILURE"):
-            _print_json(st)
-            return 0 if st.get("state") != "FAILURE" else 1
-        time.sleep(2)
+
+    # `wait` owns the terminal-state loop and, unlike an inline `while True`,
+    # gives up on its own deadline: a worker that died with the job in flight
+    # used to leave this command polling forever.
+    try:
+        st = c.wait(jid, timeout=args.timeout, on_update=show)
+    except TimeoutError as exc:
+        print(f"  {exc}")
+        return 1
+    _print_json(st)
+    return 0 if st.get("state") != "FAILURE" else 1
 
 
 # ------------------------------------------------------------------ main
@@ -392,7 +403,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     j = sub.add_parser("job", help="drive the HTTP API")
     j.add_argument("--api", default="http://127.0.0.1:8000")
-    j.add_argument("--source", default="src_clip/master.mp4")
+    j.add_argument("--source", default=DEFAULT_SRC)
     j.add_argument("--encoder", default="h264_nvenc")
     j.add_argument("--rungs", default="1080p,720p")
     j.add_argument("--watermark", default=None)
@@ -401,6 +412,8 @@ def build_parser() -> argparse.ArgumentParser:
     j.add_argument("--cancel", default=None, help="cancel this job id")
     j.add_argument("--cancel-at", default=None,
                    help="cancel when the stage matches, e.g. '1/3'")
+    j.add_argument("--timeout", type=float, default=1800.0,
+                   help="give up waiting after this many seconds (default 1800)")
     j.set_defaults(func=cmd_job)
     return p
 

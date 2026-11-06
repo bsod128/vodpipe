@@ -6,6 +6,7 @@ lives in vodpipe.jobs rather than inside a route handler.
 
 from __future__ import annotations
 
+import json
 import os
 
 import pytest
@@ -135,9 +136,55 @@ def test_health_reports_urls_without_passwords():
 def test_worker_argv_uses_threads_on_windows_and_one_slot_anywhere():
     """Celery cannot fork on Windows (billiard), and one NVENC session already
     saturates a card, so concurrency is 1 regardless of platform."""
+    pytest.importorskip("celery")
     from vodpipe.server import tasks
 
     argv = tasks.worker_argv()
     assert "-c" in argv and argv[argv.index("-c") + 1] == "1"
     if os.name == "nt":
         assert "-P" in argv and argv[argv.index("-P") + 1] == "threads"
+
+
+def test_report_contract_carries_verify_and_no_local_paths(monkeypatch, tmp_path):
+    """The contract the client's `job` command reads: rungs plus the integrity
+    verdict. Paths must be public in the written report, because it ships to
+    the client and is rendered on a status page.
+
+    The queued path used to run no integrity check at all, so `verify` is what
+    tells a client that a concatenated ladder is actually complete.
+    """
+    pytest.importorskip("celery")
+    from vodpipe import ff, report
+    from vodpipe.server import tasks
+
+    monkeypatch.setattr(ff, "version", lambda binary=None, timeout=10.0: "ffmpeg version test")
+    media_root = str(tmp_path / "jobs")
+    out = os.path.join(media_root, "cafe1234beef", "1080p.mp4")
+    checks = {"ok": False, "expect_frames": 576, "vpkts": 576, "apkts": 0,
+              "durations": [24.0], "ts_duration": 24.0, "concat_ok": True,
+              "reason": "audio stream missing"}
+    payload = tasks.build_payload(
+        job_id="cafe1234beef", cancelled=False, encoder="h264_nvenc", preset="slow",
+        nchunks=4, workers=4,
+        source_summary={"duration": 24.0, "size_bytes": 123,
+                        "video_stream": {"codec_name": "hevc"}},
+        duration=24.0, gpurep={"chosen": "CUDA ordinal 4"}, watermark=None,
+        results=[{"name": "1080p", "out": out, "kbps": 6000}],
+        wall=12.3, pkg=None, vmaf=None, checks=checks, total_wall_s=20.0)
+
+    assert payload["meta"]["chunks"] == [4, 4]
+    assert payload["verify"] == checks
+
+    written = report.sanitize(payload, media_root)
+    # Inside the media root the path becomes repo-relative; the server adds the
+    # `/jobs/` prefix when it serves the report. Elsewhere it is scrubbed.
+    assert written["encode"][0]["out"] == "cafe1234beef/1080p.mp4"
+    assert media_root not in json.dumps(written)
+    # Chunks=1 would be a lie about parallelism, so meta.chunks says None.
+    single = report.sanitize(
+        tasks.build_payload(job_id="cafe1234beef", cancelled=False, encoder="libx264",
+                            preset="slow", nchunks=1, workers=4, source_summary={},
+                            duration=24.0, gpurep=None, watermark=None, results=[],
+                            wall=1.0, pkg=None, vmaf=None, checks=checks, total_wall_s=1.0),
+        media_root)
+    assert single["meta"]["chunks"] is None

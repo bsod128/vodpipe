@@ -40,7 +40,7 @@ class Pipeline:
     # ------------------------------------------------------------- encode
     def run_ladder(self, encoder: str = "h264_nvenc", preset: str | None = None,
                    nchunks: int = 1, workers: int = 1, tag: str = "",
-                   rungs: list[Rung] | None = None, do_bitrates: bool = True,
+                   rungs: list[Rung] | None = None,
                    on_rung_done: Callable[[int, int, list], None] | None = None,
                    should_cancel: Callable[[], bool] | None = None) -> tuple[list[dict], float]:
         """Encode every rung. Returns (results, ladder_wall_s).
@@ -79,11 +79,10 @@ class Pipeline:
                 on_rung_done(i + 1, len(rungs), results)
 
         wall = time.perf_counter() - t0
-        if do_bitrates:
-            for r in results:
-                if r.get("cancelled") or not r.get("out"):
-                    continue
-                r["measured"] = metrics.bitrate(r["out"], runner=self.runner)
+        for r in results:
+            if r.get("cancelled") or not r.get("out"):
+                continue
+            r["measured"] = metrics.bitrate(r["out"], runner=self.runner)
         return results, round(wall, 2)
 
     def _encode_chunked(self, rung: Rung, enc: encoders.Encoder, out: str,
@@ -97,7 +96,7 @@ class Pipeline:
         return result
 
     # ---------------------------------------------------------- integrity
-    def verify(self, results: list[dict], expect_frames: int | None = None) -> list[dict]:
+    def verify(self, results: list[dict]) -> list[dict]:
         """Frame-count check for every chunked rung.
 
         Container duration on a concatenated TS is not trustworthy (per-chunk PCR
@@ -112,7 +111,7 @@ class Pipeline:
             # ceiling resamples the master, and comparing across bases reports
             # a false frame-count failure.
             fps = r.get("out_fps") or self.src.fps
-            expect = expect_frames or ts.expected_video_frames(self.src.duration, fps)
+            expect = ts.expected_video_frames(self.src.duration, fps)
             checks.append({"rung": r["rung"],
                            **ts.verify_concat(r["out"], expect, runner=self.runner)})
         return checks

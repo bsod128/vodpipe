@@ -8,7 +8,7 @@
         {
           "index": 4,
           "name": "NVIDIA GeForce RTX 3060",
-          "used": 2268,
+          "used": 2520,
           "total": 12288,
           "util": 9,
           "nvenc": true,
@@ -17,29 +17,29 @@
         {
           "index": 3,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16053,
+          "used": 16051,
+          "total": 16384,
+          "util": 98,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 0000029144337980] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000029144337980] No capable device"
+        },
+        {
+          "index": 1,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16099,
           "total": 16384,
           "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 0000025096ad78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000025096ad78c0] No capable device"
+          "reason": "[h264_nvenc @ 000001a90f487980] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001a90f487980] No capable device"
         },
         {
           "index": 2,
           "name": "Tesla V100-SXM2-16GB",
           "used": 16099,
           "total": 16384,
-          "util": 64,
+          "util": 49,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001b5fcdc78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001b5fcdc78c0] No capable device"
-        },
-        {
-          "index": 1,
-          "name": "Tesla V100-SXM2-16GB",
-          "used": 16107,
-          "total": 16384,
-          "util": 94,
-          "nvenc": false,
-          "reason": "[h264_nvenc @ 0000026b2c6f78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000026b2c6f78c0] No capable device"
+          "reason": "[h264_nvenc @ 0000021e3c7d7980] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000021e3c7d7980] No capable device"
         },
         {
           "index": 0,
@@ -48,19 +48,19 @@
           "total": 16384,
           "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001ed65cf78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001ed65cf78c0] No capable device"
+          "reason": "[h264_nvenc @ 0000010f5ab27980] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000010f5ab27980] No capable device"
         }
       ],
       "picked": 4
     },
     "configs": [
-      "x264_medium_whole",
-      "nvenc_p5_whole",
+      "nvenc_p1_c8w8",
       "nvenc_p5_c2w2",
       "nvenc_p5_c4w4",
-      "nvenc_p5_c8w8",
       "nvenc_p5_c8w4",
-      "nvenc_p1_c8w8"
+      "nvenc_p5_c8w8",
+      "nvenc_p5_whole",
+      "x264_medium_whole"
     ],
     "rungs": [
       "2160p",
@@ -68,27 +68,28 @@
       "720p"
     ],
     "vmaf": true,
-    "total_wall_s": 1536.0
+    "total_wall_s": 1657.5
   },
   "rows": [
     {
       "mode": "whole",
       "rung": "2160p",
       "encoder": "libx264",
-      "speed_x": 0.518,
-      "wall_s": 47.05,
+      "speed_x": 0.571,
+      "wall_s": 42.92,
+      "out_fps": 30,
       "out": "work/m2/m2_x264_medium_whole_2160p.ts",
-      "size": 81227844,
+      "size": 80846392,
       "tag": "x264_medium_whole",
-      "kbps": 27076,
+      "kbps": 26949,
       "vmaf": {
-        "vmaf_mean": 94.64,
-        "vmaf_harmonic": 94.63,
-        "vmaf_min": 92.6,
-        "vmaf_p99": 96.72,
+        "vmaf_mean": 94.62,
+        "vmaf_harmonic": 94.61,
+        "vmaf_min": 92.1,
+        "vmaf_p99": 96.59,
         "frames": 720,
-        "wall_s": 65.34,
-        "fps_metric": 11.21
+        "vmaf_basis": "pooled",
+        "wall_s": 64.0
       },
       "vs_x264": 1.0
     },
@@ -96,8 +97,9 @@
       "mode": "whole",
       "rung": "2160p",
       "encoder": "h264_nvenc",
-      "speed_x": 0.819,
-      "wall_s": 29.77,
+      "speed_x": 0.823,
+      "wall_s": 29.59,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_whole_2160p.ts",
       "size": 87837172,
       "tag": "nvenc_p5_whole",
@@ -108,10 +110,10 @@
         "vmaf_min": 93.37,
         "vmaf_p99": 96.8,
         "frames": 720,
-        "wall_s": 55.35,
-        "fps_metric": 13.39
+        "vmaf_basis": "pooled",
+        "wall_s": 63.96
       },
-      "vs_x264": 1.58
+      "vs_x264": 1.45
     },
     {
       "mode": "chunked",
@@ -119,26 +121,27 @@
       "encoder": "h264_nvenc",
       "nchunks": 2,
       "workers": 2,
-      "encode_wall_s": 29.99,
-      "concat_wall_s": 0.114,
-      "wall_s": 30.1,
-      "speed_x": 0.797,
-      "agg_speed_x": 0.406,
+      "encode_wall_s": 30.63,
+      "concat_wall_s": 0.11,
+      "wall_s": 30.74,
+      "speed_x": 0.781,
+      "agg_speed_x": 0.398,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c2w2_2160p.ts",
       "size": 89334592,
       "chunks": [
         {
           "start": 0.0,
           "end": 12.0,
-          "speed_x": 0.405,
-          "wall_s": 29.98,
+          "speed_x": 0.397,
+          "wall_s": 30.63,
           "size": 44713356
         },
         {
           "start": 12.0,
           "end": 24.0,
-          "speed_x": 0.407,
-          "wall_s": 29.93,
+          "speed_x": 0.398,
+          "wall_s": 30.59,
           "size": 44621236
         }
       ],
@@ -150,12 +153,12 @@
         "vmaf_mean": 94.91,
         "vmaf_harmonic": 94.9,
         "vmaf_min": 93.37,
-        "vmaf_p99": 96.8,
+        "vmaf_p99": 96.84,
         "frames": 720,
-        "wall_s": 55.74,
-        "fps_metric": 13.32
+        "vmaf_basis": "pooled",
+        "wall_s": 65.82
       },
-      "vs_x264": 1.56
+      "vs_x264": 1.4
     },
     {
       "mode": "chunked",
@@ -163,57 +166,58 @@
       "encoder": "h264_nvenc",
       "nchunks": 4,
       "workers": 4,
-      "encode_wall_s": 31.34,
-      "concat_wall_s": 0.115,
-      "wall_s": 31.45,
-      "speed_x": 0.763,
-      "agg_speed_x": 0.223,
+      "encode_wall_s": 32.25,
+      "concat_wall_s": 0.107,
+      "wall_s": 32.36,
+      "speed_x": 0.742,
+      "agg_speed_x": 0.189,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c4w4_2160p.ts",
-      "size": 92718216,
+      "size": 92319844,
       "chunks": [
         {
           "start": 0.0,
           "end": 6.0,
-          "speed_x": 0.217,
-          "wall_s": 29.66,
+          "speed_x": 0.187,
+          "wall_s": 32.25,
           "size": 23153328
         },
         {
           "start": 6.0,
           "end": 12.0,
-          "speed_x": 0.217,
-          "wall_s": 29.57,
+          "speed_x": 0.188,
+          "wall_s": 32.24,
           "size": 22939572
         },
         {
           "start": 12.0,
-          "end": 15.0,
-          "speed_x": 0.169,
-          "wall_s": 18.81,
-          "size": 12860704
+          "end": 18.0,
+          "speed_x": 0.19,
+          "wall_s": 32.16,
+          "size": 23307864
         },
         {
-          "start": 15.0,
+          "start": 18.0,
           "end": 24.0,
-          "speed_x": 0.289,
-          "wall_s": 31.33,
-          "size": 33764612
+          "speed_x": 0.19,
+          "wall_s": 32.19,
+          "size": 22919080
         }
       ],
       "concat_ok": true,
       "vpkts": 720,
       "tag": "nvenc_p5_c4w4",
-      "kbps": 30906,
+      "kbps": 30773,
       "vmaf": {
-        "vmaf_mean": 94.86,
-        "vmaf_harmonic": 94.85,
+        "vmaf_mean": 94.9,
+        "vmaf_harmonic": 94.89,
         "vmaf_min": 93.37,
-        "vmaf_p99": 96.8,
+        "vmaf_p99": 96.84,
         "frames": 720,
-        "wall_s": 55.19,
-        "fps_metric": 13.43
+        "vmaf_basis": "pooled",
+        "wall_s": 56.96
       },
-      "vs_x264": 1.5
+      "vs_x264": 1.33
     },
     {
       "mode": "chunked",
@@ -221,68 +225,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 35.17,
-      "concat_wall_s": 0.129,
-      "wall_s": 35.3,
-      "speed_x": 0.68,
-      "agg_speed_x": 0.086,
+      "encode_wall_s": 36.15,
+      "concat_wall_s": 0.124,
+      "wall_s": 36.28,
+      "speed_x": 0.662,
+      "agg_speed_x": 0.084,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w8_2160p.ts",
       "size": 101107716,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.086,
-          "wall_s": 35.06,
+          "speed_x": 0.083,
+          "wall_s": 36.11,
           "size": 13218280
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.089,
-          "wall_s": 34.61,
+          "speed_x": 0.083,
+          "wall_s": 36.08,
           "size": 12388636
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.086,
-          "wall_s": 35.09,
+          "speed_x": 0.084,
+          "wall_s": 36.01,
           "size": 12557836
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.085,
-          "wall_s": 35.14,
+          "speed_x": 0.086,
+          "wall_s": 35.66,
           "size": 12435260
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.086,
-          "wall_s": 35.03,
+          "speed_x": 0.084,
+          "wall_s": 36.06,
           "size": 12860704
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.087,
-          "wall_s": 34.95,
+          "speed_x": 0.084,
+          "wall_s": 35.97,
           "size": 12456504
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.085,
-          "wall_s": 35.16,
+          "speed_x": 0.083,
+          "wall_s": 36.15,
           "size": 12484892
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.085,
-          "wall_s": 35.12,
+          "speed_x": 0.084,
+          "wall_s": 36.03,
           "size": 12705604
         }
       ],
@@ -294,12 +299,12 @@
         "vmaf_mean": 94.88,
         "vmaf_harmonic": 94.88,
         "vmaf_min": 93.56,
-        "vmaf_p99": 96.8,
+        "vmaf_p99": 96.84,
         "frames": 720,
-        "wall_s": 54.72,
-        "fps_metric": 13.53
+        "vmaf_basis": "pooled",
+        "wall_s": 57.18
       },
-      "vs_x264": 1.33
+      "vs_x264": 1.18
     },
     {
       "mode": "chunked",
@@ -307,68 +312,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 4,
-      "encode_wall_s": 35.67,
-      "concat_wall_s": 0.112,
-      "wall_s": 35.78,
-      "speed_x": 0.671,
-      "agg_speed_x": 0.172,
+      "encode_wall_s": 36.46,
+      "concat_wall_s": 0.128,
+      "wall_s": 36.59,
+      "speed_x": 0.656,
+      "agg_speed_x": 0.169,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w4_2160p.ts",
       "size": 101107716,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.17,
-          "wall_s": 17.96,
+          "speed_x": 0.165,
+          "wall_s": 18.37,
           "size": 13218280
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.174,
-          "wall_s": 17.86,
+          "speed_x": 0.167,
+          "wall_s": 18.26,
           "size": 12388636
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.17,
-          "wall_s": 17.95,
+          "speed_x": 0.166,
+          "wall_s": 18.31,
           "size": 12557836
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.169,
-          "wall_s": 17.94,
+          "speed_x": 0.172,
+          "wall_s": 18.16,
           "size": 12435260
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.177,
-          "wall_s": 17.7,
+          "speed_x": 0.174,
+          "wall_s": 18.1,
           "size": 12860704
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.173,
-          "wall_s": 17.66,
+          "speed_x": 0.168,
+          "wall_s": 18.15,
           "size": 12456504
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.171,
-          "wall_s": 17.72,
+          "speed_x": 0.168,
+          "wall_s": 18.14,
           "size": 12484892
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.171,
-          "wall_s": 17.7,
+          "speed_x": 0.17,
+          "wall_s": 18.08,
           "size": 12705604
         }
       ],
@@ -380,12 +386,12 @@
         "vmaf_mean": 94.88,
         "vmaf_harmonic": 94.88,
         "vmaf_min": 93.56,
-        "vmaf_p99": 96.8,
+        "vmaf_p99": 96.84,
         "frames": 720,
-        "wall_s": 56.49,
-        "fps_metric": 13.11
+        "vmaf_basis": "pooled",
+        "wall_s": 54.98
       },
-      "vs_x264": 1.31
+      "vs_x264": 1.17
     },
     {
       "mode": "chunked",
@@ -393,68 +399,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 31.79,
-      "concat_wall_s": 0.103,
-      "wall_s": 31.9,
-      "speed_x": 0.752,
-      "agg_speed_x": 0.098,
+      "encode_wall_s": 32.49,
+      "concat_wall_s": 0.108,
+      "wall_s": 32.6,
+      "speed_x": 0.736,
+      "agg_speed_x": 0.095,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p1_c8w8_2160p.ts",
       "size": 89962700,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.097,
-          "wall_s": 31.71,
+          "speed_x": 0.095,
+          "wall_s": 32.34,
           "size": 12198756
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.097,
-          "wall_s": 31.79,
+          "speed_x": 0.096,
+          "wall_s": 32.27,
           "size": 10782552
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.098,
-          "wall_s": 31.66,
+          "speed_x": 0.096,
+          "wall_s": 32.49,
           "size": 11396936
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.098,
-          "wall_s": 31.63,
+          "speed_x": 0.095,
+          "wall_s": 32.31,
           "size": 11324368
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.099,
-          "wall_s": 31.79,
+          "speed_x": 0.096,
+          "wall_s": 32.24,
           "size": 11180736
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.097,
-          "wall_s": 31.69,
+          "speed_x": 0.095,
+          "wall_s": 32.38,
           "size": 10856436
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.098,
-          "wall_s": 31.74,
+          "speed_x": 0.095,
+          "wall_s": 32.41,
           "size": 11092376
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.097,
-          "wall_s": 31.77,
+          "speed_x": 0.096,
+          "wall_s": 32.36,
           "size": 11130540
         }
       ],
@@ -466,31 +473,32 @@
         "vmaf_mean": 94.34,
         "vmaf_harmonic": 94.34,
         "vmaf_min": 92.88,
-        "vmaf_p99": 96.21,
+        "vmaf_p99": 96.28,
         "frames": 720,
-        "wall_s": 55.33,
-        "fps_metric": 13.31
+        "vmaf_basis": "pooled",
+        "wall_s": 59.02
       },
-      "vs_x264": 1.47
+      "vs_x264": 1.32
     },
     {
       "mode": "whole",
       "rung": "1080p",
       "encoder": "libx264",
-      "speed_x": 1.54,
-      "wall_s": 15.87,
+      "speed_x": 1.49,
+      "wall_s": 16.36,
+      "out_fps": 30,
       "out": "work/m2/m2_x264_medium_whole_1080p.ts",
-      "size": 20554604,
+      "size": 20598408,
       "tag": "x264_medium_whole",
-      "kbps": 6852,
+      "kbps": 6866,
       "vmaf": {
-        "vmaf_mean": 82.53,
-        "vmaf_harmonic": 82.52,
-        "vmaf_min": 80.78,
-        "vmaf_p99": 83.93,
+        "vmaf_mean": 82.6,
+        "vmaf_harmonic": 82.6,
+        "vmaf_min": 80.97,
+        "vmaf_p99": 83.69,
         "frames": 720,
-        "wall_s": 55.55,
-        "fps_metric": 13.21
+        "vmaf_basis": "pooled",
+        "wall_s": 56.11
       },
       "vs_x264": 1.0
     },
@@ -498,8 +506,9 @@
       "mode": "whole",
       "rung": "1080p",
       "encoder": "h264_nvenc",
-      "speed_x": 2.75,
-      "wall_s": 9.13,
+      "speed_x": 2.63,
+      "wall_s": 9.52,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_whole_1080p.ts",
       "size": 20726248,
       "tag": "nvenc_p5_whole",
@@ -508,12 +517,12 @@
         "vmaf_mean": 82.16,
         "vmaf_harmonic": 82.15,
         "vmaf_min": 80.82,
-        "vmaf_p99": 83.45,
+        "vmaf_p99": 83.47,
         "frames": 720,
-        "wall_s": 54.98,
-        "fps_metric": 13.36
+        "vmaf_basis": "pooled",
+        "wall_s": 56.25
       },
-      "vs_x264": 1.74
+      "vs_x264": 1.72
     },
     {
       "mode": "chunked",
@@ -521,26 +530,27 @@
       "encoder": "h264_nvenc",
       "nchunks": 2,
       "workers": 2,
-      "encode_wall_s": 9.12,
+      "encode_wall_s": 9.36,
       "concat_wall_s": 0.027,
-      "wall_s": 9.15,
-      "speed_x": 2.624,
-      "agg_speed_x": 1.38,
+      "wall_s": 9.39,
+      "speed_x": 2.557,
+      "agg_speed_x": 1.36,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c2w2_1080p.ts",
       "size": 20884732,
       "chunks": [
         {
           "start": 0.0,
           "end": 12.0,
-          "speed_x": 1.38,
-          "wall_s": 9.06,
+          "speed_x": 1.35,
+          "wall_s": 9.36,
           "size": 10369892
         },
         {
           "start": 12.0,
           "end": 24.0,
-          "speed_x": 1.38,
-          "wall_s": 9.12,
+          "speed_x": 1.37,
+          "wall_s": 9.29,
           "size": 10514840
         }
       ],
@@ -552,12 +562,12 @@
         "vmaf_mean": 82.15,
         "vmaf_harmonic": 82.15,
         "vmaf_min": 80.82,
-        "vmaf_p99": 83.47,
+        "vmaf_p99": 83.48,
         "frames": 720,
-        "wall_s": 58.0,
-        "fps_metric": 12.66
+        "vmaf_basis": "pooled",
+        "wall_s": 56.72
       },
-      "vs_x264": 1.73
+      "vs_x264": 1.74
     },
     {
       "mode": "chunked",
@@ -565,57 +575,58 @@
       "encoder": "h264_nvenc",
       "nchunks": 4,
       "workers": 4,
-      "encode_wall_s": 9.57,
+      "encode_wall_s": 10.05,
       "concat_wall_s": 0.027,
-      "wall_s": 9.6,
-      "speed_x": 2.5,
-      "agg_speed_x": 0.73,
+      "wall_s": 10.08,
+      "speed_x": 2.381,
+      "agg_speed_x": 0.635,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c4w4_1080p.ts",
-      "size": 21712496,
+      "size": 21313184,
       "chunks": [
         {
           "start": 0.0,
           "end": 6.0,
-          "speed_x": 0.725,
-          "wall_s": 9.11,
+          "speed_x": 0.649,
+          "wall_s": 9.92,
           "size": 5344276
         },
         {
           "start": 6.0,
           "end": 12.0,
-          "speed_x": 0.734,
-          "wall_s": 9.05,
+          "speed_x": 0.633,
+          "wall_s": 10.05,
           "size": 5490540
         },
         {
           "start": 12.0,
-          "end": 15.0,
-          "speed_x": 0.486,
-          "wall_s": 7.44,
-          "size": 2658320
+          "end": 18.0,
+          "speed_x": 0.628,
+          "wall_s": 10.01,
+          "size": 5248772
         },
         {
-          "start": 15.0,
+          "start": 18.0,
           "end": 24.0,
-          "speed_x": 0.973,
-          "wall_s": 9.57,
-          "size": 8219360
+          "speed_x": 0.629,
+          "wall_s": 9.97,
+          "size": 5229596
         }
       ],
       "concat_ok": true,
       "vpkts": 720,
       "tag": "nvenc_p5_c4w4",
-      "kbps": 7237,
+      "kbps": 7104,
       "vmaf": {
         "vmaf_mean": 82.15,
         "vmaf_harmonic": 82.15,
         "vmaf_min": 81.06,
-        "vmaf_p99": 83.48,
+        "vmaf_p99": 83.54,
         "frames": 720,
-        "wall_s": 54.83,
-        "fps_metric": 13.38
+        "vmaf_basis": "pooled",
+        "wall_s": 57.23
       },
-      "vs_x264": 1.65
+      "vs_x264": 1.62
     },
     {
       "mode": "chunked",
@@ -623,68 +634,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 11.71,
-      "concat_wall_s": 0.03,
-      "wall_s": 11.74,
-      "speed_x": 2.044,
-      "agg_speed_x": 0.275,
+      "encode_wall_s": 12.06,
+      "concat_wall_s": 0.032,
+      "wall_s": 12.09,
+      "speed_x": 1.985,
+      "agg_speed_x": 0.264,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w8_1080p.ts",
       "size": 22175916,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.272,
-          "wall_s": 11.71,
+          "speed_x": 0.269,
+          "wall_s": 11.89,
           "size": 2945396
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.282,
-          "wall_s": 11.59,
+          "speed_x": 0.264,
+          "wall_s": 11.98,
           "size": 2728632
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.269,
-          "wall_s": 11.62,
+          "speed_x": 0.26,
+          "wall_s": 12.01,
           "size": 2688776
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.27,
-          "wall_s": 11.57,
+          "speed_x": 0.263,
+          "wall_s": 12.05,
           "size": 2926032
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.273,
-          "wall_s": 11.64,
+          "speed_x": 0.265,
+          "wall_s": 11.95,
           "size": 2658320
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.281,
-          "wall_s": 11.53,
+          "speed_x": 0.261,
+          "wall_s": 11.98,
           "size": 2788980
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.279,
-          "wall_s": 11.66,
+          "speed_x": 0.273,
+          "wall_s": 11.84,
           "size": 2724496
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.27,
-          "wall_s": 11.7,
+          "speed_x": 0.26,
+          "wall_s": 12.03,
           "size": 2715284
         }
       ],
@@ -696,10 +708,10 @@
         "vmaf_mean": 82.17,
         "vmaf_harmonic": 82.17,
         "vmaf_min": 81.13,
-        "vmaf_p99": 83.49,
+        "vmaf_p99": 83.53,
         "frames": 720,
-        "wall_s": 54.71,
-        "fps_metric": 13.41
+        "vmaf_basis": "pooled",
+        "wall_s": 56.91
       },
       "vs_x264": 1.35
     },
@@ -709,68 +721,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 4,
-      "encode_wall_s": 12.25,
-      "concat_wall_s": 0.034,
-      "wall_s": 12.29,
-      "speed_x": 1.954,
-      "agg_speed_x": 0.537,
+      "encode_wall_s": 12.63,
+      "concat_wall_s": 0.036,
+      "wall_s": 12.67,
+      "speed_x": 1.894,
+      "agg_speed_x": 0.523,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w4_1080p.ts",
       "size": 22175916,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.534,
-          "wall_s": 6.17,
+          "speed_x": 0.502,
+          "wall_s": 6.38,
           "size": 2945396
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.519,
-          "wall_s": 6.21,
+          "speed_x": 0.52,
+          "wall_s": 6.32,
           "size": 2728632
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.524,
-          "wall_s": 6.13,
+          "speed_x": 0.538,
+          "wall_s": 6.3,
           "size": 2688776
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.544,
-          "wall_s": 6.16,
+          "speed_x": 0.506,
+          "wall_s": 6.34,
           "size": 2926032
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.548,
-          "wall_s": 6.06,
+          "speed_x": 0.514,
+          "wall_s": 6.24,
           "size": 2658320
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.525,
-          "wall_s": 6.06,
+          "speed_x": 0.509,
+          "wall_s": 6.26,
           "size": 2788980
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.564,
-          "wall_s": 5.99,
+          "speed_x": 0.576,
+          "wall_s": 6.14,
           "size": 2724496
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.536,
-          "wall_s": 6.04,
+          "speed_x": 0.522,
+          "wall_s": 6.25,
           "size": 2715284
         }
       ],
@@ -782,10 +795,10 @@
         "vmaf_mean": 82.17,
         "vmaf_harmonic": 82.17,
         "vmaf_min": 81.13,
-        "vmaf_p99": 83.49,
+        "vmaf_p99": 83.53,
         "frames": 720,
-        "wall_s": 55.19,
-        "fps_metric": 13.34
+        "vmaf_basis": "pooled",
+        "wall_s": 56.37
       },
       "vs_x264": 1.29
     },
@@ -795,68 +808,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 10.85,
-      "concat_wall_s": 0.028,
-      "wall_s": 10.87,
-      "speed_x": 2.207,
-      "agg_speed_x": 0.301,
+      "encode_wall_s": 11.04,
+      "concat_wall_s": 0.031,
+      "wall_s": 11.07,
+      "speed_x": 2.168,
+      "agg_speed_x": 0.295,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p1_c8w8_1080p.ts",
       "size": 21734116,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.304,
-          "wall_s": 10.66,
+          "speed_x": 0.292,
+          "wall_s": 11.02,
           "size": 2797252
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.297,
-          "wall_s": 10.76,
+          "speed_x": 0.292,
+          "wall_s": 11.04,
           "size": 2748748
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.302,
-          "wall_s": 10.69,
+          "speed_x": 0.295,
+          "wall_s": 10.94,
           "size": 2692160
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.298,
-          "wall_s": 10.84,
+          "speed_x": 0.299,
+          "wall_s": 10.85,
           "size": 2721300
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.302,
-          "wall_s": 10.74,
+          "speed_x": 0.297,
+          "wall_s": 10.88,
           "size": 2725624
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.3,
-          "wall_s": 10.71,
+          "speed_x": 0.294,
+          "wall_s": 10.96,
           "size": 2685768
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.297,
-          "wall_s": 10.79,
+          "speed_x": 0.296,
+          "wall_s": 10.92,
           "size": 2673924
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.309,
-          "wall_s": 10.63,
+          "speed_x": 0.296,
+          "wall_s": 10.99,
           "size": 2689340
         }
       ],
@@ -868,31 +882,32 @@
         "vmaf_mean": 81.3,
         "vmaf_harmonic": 81.3,
         "vmaf_min": 80.38,
-        "vmaf_p99": 82.99,
+        "vmaf_p99": 83.0,
         "frames": 720,
-        "wall_s": 55.75,
-        "fps_metric": 13.16
+        "vmaf_basis": "pooled",
+        "wall_s": 57.41
       },
-      "vs_x264": 1.46
+      "vs_x264": 1.48
     },
     {
       "mode": "whole",
       "rung": "720p",
       "encoder": "libx264",
-      "speed_x": 2.66,
-      "wall_s": 9.26,
+      "speed_x": 2.28,
+      "wall_s": 10.75,
+      "out_fps": 30,
       "out": "work/m2/m2_x264_medium_whole_720p.ts",
-      "size": 10501492,
+      "size": 10511268,
       "tag": "x264_medium_whole",
-      "kbps": 3500,
+      "kbps": 3504,
       "vmaf": {
-        "vmaf_mean": 76.67,
-        "vmaf_harmonic": 76.67,
-        "vmaf_min": 73.73,
-        "vmaf_p99": 78.06,
+        "vmaf_mean": 76.8,
+        "vmaf_harmonic": 76.79,
+        "vmaf_min": 74.04,
+        "vmaf_p99": 78.16,
         "frames": 720,
-        "wall_s": 54.29,
-        "fps_metric": 13.46
+        "vmaf_basis": "pooled",
+        "wall_s": 64.73
       },
       "vs_x264": 1.0
     },
@@ -900,8 +915,9 @@
       "mode": "whole",
       "rung": "720p",
       "encoder": "h264_nvenc",
-      "speed_x": 4.58,
-      "wall_s": 5.64,
+      "speed_x": 3.98,
+      "wall_s": 6.79,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_whole_720p.ts",
       "size": 10949308,
       "tag": "nvenc_p5_whole",
@@ -910,12 +926,12 @@
         "vmaf_mean": 76.12,
         "vmaf_harmonic": 76.12,
         "vmaf_min": 73.57,
-        "vmaf_p99": 77.05,
+        "vmaf_p99": 77.41,
         "frames": 720,
-        "wall_s": 52.7,
-        "fps_metric": 13.92
+        "vmaf_basis": "pooled",
+        "wall_s": 77.04
       },
-      "vs_x264": 1.64
+      "vs_x264": 1.58
     },
     {
       "mode": "chunked",
@@ -923,26 +939,27 @@
       "encoder": "h264_nvenc",
       "nchunks": 2,
       "workers": 2,
-      "encode_wall_s": 5.55,
-      "concat_wall_s": 0.023,
-      "wall_s": 5.58,
-      "speed_x": 4.305,
-      "agg_speed_x": 2.345,
+      "encode_wall_s": 5.92,
+      "concat_wall_s": 0.014,
+      "wall_s": 5.93,
+      "speed_x": 4.046,
+      "agg_speed_x": 2.19,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c2w2_720p.ts",
       "size": 10783304,
       "chunks": [
         {
           "start": 0.0,
           "end": 12.0,
-          "speed_x": 2.34,
-          "wall_s": 5.55,
+          "speed_x": 2.19,
+          "wall_s": 5.92,
           "size": 5412708
         },
         {
           "start": 12.0,
           "end": 24.0,
-          "speed_x": 2.35,
-          "wall_s": 5.53,
+          "speed_x": 2.19,
+          "wall_s": 5.9,
           "size": 5370596
         }
       ],
@@ -954,12 +971,12 @@
         "vmaf_mean": 76.17,
         "vmaf_harmonic": 76.16,
         "vmaf_min": 73.37,
-        "vmaf_p99": 77.05,
+        "vmaf_p99": 77.44,
         "frames": 720,
-        "wall_s": 52.56,
-        "fps_metric": 13.95
+        "vmaf_basis": "pooled",
+        "wall_s": 63.59
       },
-      "vs_x264": 1.66
+      "vs_x264": 1.81
     },
     {
       "mode": "chunked",
@@ -967,57 +984,58 @@
       "encoder": "h264_nvenc",
       "nchunks": 4,
       "workers": 4,
-      "encode_wall_s": 6.02,
-      "concat_wall_s": 0.014,
-      "wall_s": 6.03,
-      "speed_x": 3.978,
-      "agg_speed_x": 1.159,
+      "encode_wall_s": 6.14,
+      "concat_wall_s": 0.015,
+      "wall_s": 6.15,
+      "speed_x": 3.9,
+      "agg_speed_x": 1.088,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c4w4_720p.ts",
-      "size": 10940660,
+      "size": 11213824,
       "chunks": [
         {
           "start": 0.0,
           "end": 6.0,
-          "speed_x": 1.14,
-          "wall_s": 5.93,
+          "speed_x": 1.12,
+          "wall_s": 6.05,
           "size": 2731640
         },
         {
           "start": 6.0,
           "end": 12.0,
-          "speed_x": 1.17,
-          "wall_s": 5.8,
+          "speed_x": 1.07,
+          "wall_s": 6.14,
           "size": 2695732
         },
         {
           "start": 12.0,
-          "end": 15.0,
-          "speed_x": 0.728,
-          "wall_s": 5.11,
-          "size": 1351156
+          "end": 18.0,
+          "speed_x": 1.1,
+          "wall_s": 6.07,
+          "size": 2881476
         },
         {
-          "start": 15.0,
+          "start": 18.0,
           "end": 24.0,
-          "speed_x": 1.6,
-          "wall_s": 6.02,
-          "size": 4162132
+          "speed_x": 1.06,
+          "wall_s": 6.1,
+          "size": 2904976
         }
       ],
       "concat_ok": true,
       "vpkts": 720,
       "tag": "nvenc_p5_c4w4",
-      "kbps": 3647,
+      "kbps": 3738,
       "vmaf": {
-        "vmaf_mean": 76.14,
-        "vmaf_harmonic": 76.14,
+        "vmaf_mean": 76.15,
+        "vmaf_harmonic": 76.15,
         "vmaf_min": 72.03,
-        "vmaf_p99": 77.05,
+        "vmaf_p99": 77.44,
         "frames": 720,
-        "wall_s": 54.31,
-        "fps_metric": 13.5
+        "vmaf_basis": "pooled",
+        "wall_s": 63.06
       },
-      "vs_x264": 1.54
+      "vs_x264": 1.75
     },
     {
       "mode": "chunked",
@@ -1025,68 +1043,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 7.84,
+      "encode_wall_s": 7.94,
       "concat_wall_s": 0.024,
-      "wall_s": 7.86,
-      "speed_x": 3.053,
-      "agg_speed_x": 0.418,
+      "wall_s": 7.96,
+      "speed_x": 3.015,
+      "agg_speed_x": 0.43,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w8_720p.ts",
       "size": 10861324,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.413,
-          "wall_s": 7.84,
+          "speed_x": 0.481,
+          "wall_s": 7.53,
           "size": 1296072
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.43,
-          "wall_s": 7.67,
+          "speed_x": 0.423,
+          "wall_s": 7.77,
           "size": 1365632
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.429,
-          "wall_s": 7.65,
+          "speed_x": 0.421,
+          "wall_s": 7.88,
           "size": 1346080
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.415,
-          "wall_s": 7.77,
+          "speed_x": 0.414,
+          "wall_s": 7.93,
           "size": 1444592
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.419,
-          "wall_s": 7.72,
+          "speed_x": 0.408,
+          "wall_s": 7.85,
           "size": 1351156
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.409,
-          "wall_s": 7.75,
+          "speed_x": 0.416,
+          "wall_s": 7.79,
           "size": 1346456
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.416,
-          "wall_s": 7.79,
+          "speed_x": 0.457,
+          "wall_s": 7.64,
           "size": 1355668
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.415,
-          "wall_s": 7.7,
+          "speed_x": 0.422,
+          "wall_s": 7.82,
           "size": 1355668
         }
       ],
@@ -1098,12 +1117,12 @@
         "vmaf_mean": 76.14,
         "vmaf_harmonic": 76.14,
         "vmaf_min": 72.03,
-        "vmaf_p99": 77.08,
+        "vmaf_p99": 77.44,
         "frames": 720,
-        "wall_s": 54.42,
-        "fps_metric": 13.47
+        "vmaf_basis": "pooled",
+        "wall_s": 60.48
       },
-      "vs_x264": 1.18
+      "vs_x264": 1.35
     },
     {
       "mode": "chunked",
@@ -1111,68 +1130,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 4,
-      "encode_wall_s": 8.19,
-      "concat_wall_s": 0.026,
-      "wall_s": 8.22,
-      "speed_x": 2.921,
-      "agg_speed_x": 0.823,
+      "encode_wall_s": 8.45,
+      "concat_wall_s": 0.017,
+      "wall_s": 8.46,
+      "speed_x": 2.836,
+      "agg_speed_x": 0.813,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p5_c8w4_720p.ts",
       "size": 10861324,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.777,
-          "wall_s": 4.19,
+          "speed_x": 0.765,
+          "wall_s": 4.35,
           "size": 1296072
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.857,
-          "wall_s": 4.16,
+          "speed_x": 0.849,
+          "wall_s": 4.23,
           "size": 1365632
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.774,
-          "wall_s": 4.25,
+          "speed_x": 0.781,
+          "wall_s": 4.29,
           "size": 1346080
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.795,
-          "wall_s": 4.18,
+          "speed_x": 0.792,
+          "wall_s": 4.27,
           "size": 1444592
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.869,
-          "wall_s": 3.96,
+          "speed_x": 0.788,
+          "wall_s": 4.18,
           "size": 1351156
         },
         {
           "start": 15.0,
           "end": 18.0,
           "speed_x": 0.852,
-          "wall_s": 3.95,
+          "wall_s": 4.09,
           "size": 1346456
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.821,
-          "wall_s": 3.98,
+          "speed_x": 0.797,
+          "wall_s": 4.15,
           "size": 1355668
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.842,
-          "wall_s": 3.94,
+          "speed_x": 0.878,
+          "wall_s": 4.05,
           "size": 1355668
         }
       ],
@@ -1184,12 +1204,12 @@
         "vmaf_mean": 76.14,
         "vmaf_harmonic": 76.14,
         "vmaf_min": 72.03,
-        "vmaf_p99": 77.08,
+        "vmaf_p99": 77.44,
         "frames": 720,
-        "wall_s": 51.85,
-        "fps_metric": 14.14
+        "vmaf_basis": "pooled",
+        "wall_s": 60.94
       },
-      "vs_x264": 1.13
+      "vs_x264": 1.27
     },
     {
       "mode": "chunked",
@@ -1197,68 +1217,69 @@
       "encoder": "h264_nvenc",
       "nchunks": 8,
       "workers": 8,
-      "encode_wall_s": 7.32,
-      "concat_wall_s": 0.017,
-      "wall_s": 7.34,
-      "speed_x": 3.271,
-      "agg_speed_x": 0.462,
+      "encode_wall_s": 7.77,
+      "concat_wall_s": 0.025,
+      "wall_s": 7.79,
+      "speed_x": 3.08,
+      "agg_speed_x": 0.439,
+      "out_fps": 30,
       "out": "work/m2/m2_nvenc_p1_c8w8_720p.ts",
       "size": 11862236,
       "chunks": [
         {
           "start": 0.0,
           "end": 3.0,
-          "speed_x": 0.482,
-          "wall_s": 7.11,
+          "speed_x": 0.436,
+          "wall_s": 7.63,
           "size": 1491592
         },
         {
           "start": 3.0,
           "end": 6.0,
-          "speed_x": 0.453,
-          "wall_s": 7.26,
+          "speed_x": 0.44,
+          "wall_s": 7.71,
           "size": 1546112
         },
         {
           "start": 6.0,
           "end": 9.0,
-          "speed_x": 0.455,
-          "wall_s": 7.22,
+          "speed_x": 0.434,
+          "wall_s": 7.76,
           "size": 1472228
         },
         {
           "start": 9.0,
           "end": 12.0,
-          "speed_x": 0.451,
-          "wall_s": 7.32,
+          "speed_x": 0.453,
+          "wall_s": 7.54,
           "size": 1484448
         },
         {
           "start": 12.0,
           "end": 15.0,
-          "speed_x": 0.453,
-          "wall_s": 7.28,
+          "speed_x": 0.429,
+          "wall_s": 7.68,
           "size": 1473920
         },
         {
           "start": 15.0,
           "end": 18.0,
-          "speed_x": 0.459,
-          "wall_s": 7.29,
+          "speed_x": 0.447,
+          "wall_s": 7.59,
           "size": 1451736
         },
         {
           "start": 18.0,
           "end": 21.0,
-          "speed_x": 0.471,
-          "wall_s": 7.16,
+          "speed_x": 0.429,
+          "wall_s": 7.76,
           "size": 1459820
         },
         {
           "start": 21.0,
           "end": 24.0,
-          "speed_x": 0.469,
-          "wall_s": 7.18,
+          "speed_x": 0.444,
+          "wall_s": 7.65,
           "size": 1482380
         }
       ],
@@ -1272,10 +1293,10 @@
         "vmaf_min": 72.02,
         "vmaf_p99": 76.69,
         "frames": 720,
-        "wall_s": 52.09,
-        "fps_metric": 14.13
+        "vmaf_basis": "pooled",
+        "wall_s": 56.81
       },
-      "vs_x264": 1.26
+      "vs_x264": 1.38
     }
   ]
 }

@@ -55,15 +55,6 @@ class Rung:
             w = int(round(src_w * h / src_h / 2) * 2)
         return f"scale={w}:{h}:flags=lanczos"
 
-    def as_dict(self) -> dict:
-        return {
-            "rung": self.label, "resolution": f"{self.width}x{self.height}",
-            "target_kbps": self.kbps, "maxrate_kbps": self.maxrate // 1000,
-            "bufsize_kbps": self.bufsize // 1000, "max_fps": self.max_fps,
-            "audio_kbps": self.audio // 1000, "devices": self.devices,
-        }
-
-
 def ladder(target_heights: list[int] | None = None) -> list[Rung]:
     """The reference 4K ladder.
 

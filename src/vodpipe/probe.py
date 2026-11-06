@@ -45,13 +45,6 @@ class Source:
                 f"{self.duration:.2f} s, {self.bitrate // 1000} kbps, "
                 f"IDR: {len(self.keyframes)}")
 
-    def as_dict(self) -> dict:
-        return {
-            "path": self.path, "duration": self.duration, "resolution": self.resolution,
-            "fps": self.fps, "vcodec": self.vcodec, "acodec": self.acodec,
-            "bitrate": self.bitrate, "keyframes": len(self.keyframes),
-        }
-
 
 def parse_frame_rate(raw: str | None) -> float:
     """`avg_frame_rate` is a rational string like "30000/1001"; "0/0" means unset."""
@@ -105,6 +98,12 @@ def keyframes(path: str, runner: ff.Runner | None = None) -> list[float]:
     return sorted(out)
 
 
+#: How unbalanced a keyframe-chosen split may be before the uniform grid wins.
+#: 2x is deliberately loose: a modest imbalance is normal for real GOPs, while
+#: anything past this is mostly idle workers (see the docstring below).
+_MAX_CHUNK_SKEW = 2.0
+
+
 def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[float, float]]:
     """Split [0, duration] into n ranges whose borders are IDR frames.
 
@@ -115,16 +114,28 @@ def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[f
     chunks start at non-keyframes: ffmpeg's `-ss` before `-i` still snaps to the
     nearest IDR, which is why the resulting total stays frame-accurate - the
     frame count check in `vodpipe.ts.verify_concat` is what proves it.
+
+    The same fallback also covers *unbalanced* keyframes. "Evenly spaced
+    keyframes" and "evenly sized chunks" are different things: on the 4K master
+    (GOP 3 s, 24 s long) `n=4` picked borders that gave 3 s / 6 s / 6 s / 9 s
+    chunks, so one chunk ran three times as long as the smallest and the rung's
+    wall time was that chunk with the other workers idle. Chunking is this
+    project's multi-GPU tool, and a 3x skew is what wastes a card - so borders
+    more than `_MAX_CHUNK_SKEW` apart are rejected in favour of the uniform grid.
     """
     if n <= 0:
         raise ValueError("n must be positive")
     if duration <= 0:
         raise ValueError("duration must be positive")
 
+    def uniform() -> list[tuple[float, float]]:
+        grid = [round(i * duration / n, 4) for i in range(n + 1)]
+        grid[-1] = round(duration, 4)
+        return _ranges(grid, n)
+
     usable = [k for k in keyframes if 0.0 <= k <= duration]
     if len(usable) < n + 1:
-        step = duration / n
-        usable = [round(i * step, 4) for i in range(n + 1)]
+        return uniform()
 
     # Pick n+1 borders as evenly as possible over the available keyframes.
     last = len(usable) - 1
@@ -133,5 +144,12 @@ def plan_chunks(duration: float, keyframes: list[float], n: int) -> list[tuple[f
     borders[0] = 0.0
     borders[-1] = round(duration, 4)
 
-    ranges = [(borders[i], borders[i + 1]) for i in range(n)]
-    return [(s, e) for (s, e) in ranges if e > s]
+    ranges = _ranges(borders, n)
+    sizes = [e - s for s, e in ranges]
+    if min(sizes) <= 0 or max(sizes) > _MAX_CHUNK_SKEW * min(sizes):
+        return uniform()
+    return ranges
+
+
+def _ranges(borders: list[float], n: int) -> list[tuple[float, float]]:
+    return [(borders[i], borders[i + 1]) for i in range(n) if borders[i + 1] > borders[i]]

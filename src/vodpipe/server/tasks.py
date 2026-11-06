@@ -13,6 +13,7 @@ finished rung usable, so a cancelled job still ships something.
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 
@@ -22,6 +23,12 @@ from .. import encoders, ff, gpu, pipeline, report
 from ..jobs import cancel_key, rung_subset, rung_summary
 from ..ladder import ladder
 from . import settings
+
+#: Worker-level events go to the logger, not to stdout: this process is started
+#: by an operator or a supervisor, and its output is read as a log. The pipeline
+#: core it calls still prints, because the same code drives `vodpipe demo`, where
+#: stdout *is* the interface - a deliberate split, not an oversight.
+log = logging.getLogger("vodpipe.worker")
 
 app = Celery("vodpipe", broker=settings.BROKER_URL, backend=settings.RESULT_BACKEND)
 app.conf.update(
@@ -37,10 +44,6 @@ app.conf.update(
     task_acks_late=True,
     result_expires=86400,
 )
-
-
-class JobCancelled(Exception):
-    """Raised internally when the cancel flag is set; never reaches the client."""
 
 
 def state_client():
@@ -69,8 +72,44 @@ def _pick_gpu(encoder: str) -> dict | None:
     if not enc.hw:
         return None
     rep = gpu.pick(enc.codec)
-    print(gpu.summary(rep))
+    # A pick that lands on the wrong card silently costs minutes per rung, so it
+    # belongs in the log the operator reads, not only in stdout of a manual run.
+    log.info("gpu pick: %s", gpu.summary(rep))
     return rep
+
+
+def build_payload(*, job_id: str, cancelled: bool, encoder: str, preset: str | None,
+                  nchunks: int, workers: int, source_summary: str, duration: float,
+                  gpurep: dict | None, watermark: dict | None, results: list,
+                  wall: float, pkg: dict | None, vmaf: dict | None,
+                  checks: list, total_wall_s: float) -> dict:
+    """The `report.json` shape, built from plain values.
+
+    Split out of the task body because the task cannot run in a unit test (it
+    needs a broker, a backend and a GPU) while this schema can. `verify` is the
+    chunk-integrity result: the queued path used to ship a report without it, so
+    the only stage that proves a concat dropped no frames existed on the CLI path.
+    """
+    return {
+        "job_id": job_id,
+        "cancelled": cancelled,
+        "meta": {
+            "ffmpeg": ff.version(),
+            "encoder": encoder,
+            "preset": preset,
+            "chunks": [nchunks, workers] if nchunks > 1 else None,
+            "source": source_summary,
+            "duration": duration,
+            "gpu": gpurep,
+            "watermark": watermark,
+        },
+        "encode": results,
+        "ladder_wall_s": wall,
+        "packaging": pkg,
+        "vmaf": vmaf,
+        "verify": checks,
+        "total_wall_s": total_wall_s,
+    }
 
 
 @app.task(name="vodpipe.transcode", bind=True, max_retries=0)
@@ -138,6 +177,11 @@ def transcode(self, job_id: str, spec: dict) -> dict:
         should_cancel=should_cancel,
     )
     finished = [r for r in results if not r.get("cancelled")]
+    # Integrity belongs to the pipeline, not to the CLI that happens to call it.
+    # A queued chunked job used to publish without this check, so the one stage
+    # that proves a concat dropped no frames only ran in `vodpipe demo`.
+    # It is cheap when nothing was chunked (no ffprobe at all).
+    checks = p.verify(finished)
 
     def finish(pkg: dict | None = None, vmaf: dict | None = None) -> dict:
         """One final report shape for both the success and the cancelled path.
@@ -145,25 +189,12 @@ def transcode(self, job_id: str, spec: dict) -> dict:
         A cancelled job is not a failed job: finished rungs are kept, the
         status says CANCELLED, and the client decides whether to reuse them.
         """
-        payload = {
-            "job_id": job_id,
-            "cancelled": cancelled["flag"],
-            "meta": {
-                "ffmpeg": ff.version(),
-                "encoder": encoder,
-                "preset": preset,
-                "chunks": [nchunks, workers] if nchunks > 1 else None,
-                "source": p.src.summary(),
-                "duration": p.src.duration,
-                "gpu": gpurep,
-                "watermark": spec.get("watermark"),
-            },
-            "encode": results,
-            "ladder_wall_s": wall,
-            "packaging": pkg,
-            "vmaf": vmaf,
-            "total_wall_s": round(time.perf_counter() - t0, 2),
-        }
+        payload = build_payload(
+            job_id=job_id, cancelled=cancelled["flag"], encoder=encoder, preset=preset,
+            nchunks=nchunks, workers=workers, source_summary=p.src.summary(),
+            duration=p.src.duration, gpurep=gpurep, watermark=spec.get("watermark"),
+            results=results, wall=wall, pkg=pkg, vmaf=vmaf, checks=checks,
+            total_wall_s=round(time.perf_counter() - t0, 2))
         report_path = report.dump(os.path.join(work, "report.json"),
                                   report.sanitize(payload, settings.MEDIA_ROOT))
         # Artifact paths are returned to the client, so they are repo-relative:

@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
@@ -137,8 +136,7 @@ def encode_chunk(src: Source, rung: Rung, enc: Encoder, start: float, end: float
 
 def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
                       nchunks: int, workers: int, chunk_dir: str, wm: str = "",
-                      runner: ff.Runner | None = None,
-                      on_chunk_done: Callable[[int, int], None] | None = None) -> dict:
+                      runner: ff.Runner | None = None) -> dict:
     """Encode nchunks ranges with up to `workers` parallel ffmpeg processes.
 
     Returns both numbers on purpose:
@@ -163,8 +161,6 @@ def transcode_chunked(src: Source, rung: Rung, enc: Encoder, out_path: str,
         ]
         for fut in futures:
             stats.append(fut.result())
-            if on_chunk_done:
-                on_chunk_done(len(stats), len(bounds))
     encode_wall = time.perf_counter() - t0
 
     t1 = time.perf_counter()
