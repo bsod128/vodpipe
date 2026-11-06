@@ -3,56 +3,57 @@
   "meta": {
     "ffmpeg": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
     "encoder": "h264_nvenc",
-    "preset": null,
-    "chunks": 1,
+    "preset": "p5",
+    "chunks": null,
     "source": "3840x2160@30.0 h264+aac, 24.00 s, 217704 kbps, IDR: 8",
+    "duration": 24.0,
     "gpu": {
       "codec": "h264_nvenc",
       "cards": [
         {
           "index": 4,
           "name": "NVIDIA GeForce RTX 3060",
-          "used": 2349,
+          "used": 2462,
           "total": 12288,
-          "util": 12,
+          "util": 3,
           "nvenc": true,
           "reason": "ok"
         },
         {
           "index": 3,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16055,
+          "used": 16053,
           "total": 16384,
           "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001a866d378c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001a866d378c0] No capable device"
+          "reason": "[h264_nvenc @ 00000190871c79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000190871c79c0] No capable device"
         },
         {
           "index": 2,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16103,
+          "used": 16101,
           "total": 16384,
           "util": 0,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 0000021aab2078c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000021aab2078c0] No capable device"
+          "reason": "[h264_nvenc @ 00000231df9e79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000231df9e79c0] No capable device"
         },
         {
           "index": 1,
           "name": "Tesla V100-SXM2-16GB",
-          "used": 16111,
+          "used": 16103,
           "total": 16384,
           "util": 99,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 0000014bdcd078c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 0000014bdcd078c0] No capable device"
+          "reason": "[h264_nvenc @ 00000214b64779c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000214b64779c0] No capable device"
         },
         {
           "index": 0,
           "name": "Tesla V100-SXM2-16GB",
           "used": 16159,
           "total": 16384,
-          "util": 93,
+          "util": 100,
           "nvenc": false,
-          "reason": "[h264_nvenc @ 000001cb55cf78c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001cb55cf78c0] No capable device"
+          "reason": "[h264_nvenc @ 00000133ece079c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000133ece079c0] No capable device"
         }
       ],
       "picked": 4
@@ -71,8 +72,9 @@
       "mode": "whole",
       "rung": "2160p",
       "encoder": "h264_nvenc",
-      "speed_x": 0.822,
-      "wall_s": 29.67,
+      "speed_x": 0.816,
+      "wall_s": 29.84,
+      "out_fps": 30,
       "out": "work/demo/demo_2160p_h264_nvenc.ts",
       "size": 87837172,
       "rung_res": "3840x2160",
@@ -107,8 +109,9 @@
       "mode": "whole",
       "rung": "1440p",
       "encoder": "h264_nvenc",
-      "speed_x": 1.79,
-      "wall_s": 13.83,
+      "speed_x": 1.78,
+      "wall_s": 14.01,
+      "out_fps": 30,
       "out": "work/demo/demo_1440p_h264_nvenc.ts",
       "size": 35117272,
       "rung_res": "2560x1440",
@@ -144,7 +147,8 @@
       "rung": "1080p",
       "encoder": "h264_nvenc",
       "speed_x": 2.71,
-      "wall_s": 9.34,
+      "wall_s": 9.3,
+      "out_fps": 30,
       "out": "work/demo/demo_1080p_h264_nvenc.ts",
       "size": 20726248,
       "rung_res": "1920x1080",
@@ -179,8 +183,9 @@
       "mode": "whole",
       "rung": "720p",
       "encoder": "h264_nvenc",
-      "speed_x": 4.48,
-      "wall_s": 5.8,
+      "speed_x": 4.44,
+      "wall_s": 5.86,
+      "out_fps": 30,
       "out": "work/demo/demo_720p_h264_nvenc.ts",
       "size": 10949308,
       "rung_res": "1280x720",
@@ -215,8 +220,9 @@
       "mode": "whole",
       "rung": "432p",
       "encoder": "h264_nvenc",
-      "speed_x": 5.47,
-      "wall_s": 4.77,
+      "speed_x": 5.89,
+      "wall_s": 4.49,
+      "out_fps": 30,
       "out": "work/demo/demo_432p_h264_nvenc.ts",
       "size": 5135972,
       "rung_res": "768x432",
@@ -248,12 +254,12 @@
       }
     }
   ],
-  "ladder_wall_s": 63.41,
+  "ladder_wall_s": 63.52,
   "packaging": {
     "hls": {
       "kind": "hls",
       "master": "out/demo/hls/master.m3u8",
-      "wall_s": 1.42,
+      "wall_s": 1.47,
       "variants": [
         {
           "bandwidth": 31656548,
@@ -291,7 +297,7 @@
     "dash": {
       "kind": "dash",
       "manifest": "out/demo/dash/manifest.mpd",
-      "wall_s": 1.37,
+      "wall_s": 1.46,
       "representations": [
         {
           "media": "video",
@@ -391,7 +397,8 @@
       "vmaf_min": 93.37,
       "vmaf_p99": 96.8,
       "frames": 720,
-      "wall_s": 56.43
+      "vmaf_basis": "pooled",
+      "wall_s": 61.44
     },
     "1440p": {
       "vmaf_mean": 87.14,
@@ -399,7 +406,8 @@
       "vmaf_min": 85.9,
       "vmaf_p99": 88.5,
       "frames": 720,
-      "wall_s": 61.64
+      "vmaf_basis": "pooled",
+      "wall_s": 56.19
     },
     "1080p": {
       "vmaf_mean": 82.16,
@@ -407,7 +415,8 @@
       "vmaf_min": 80.82,
       "vmaf_p99": 83.47,
       "frames": 720,
-      "wall_s": 57.44
+      "vmaf_basis": "pooled",
+      "wall_s": 57.82
     },
     "720p": {
       "vmaf_mean": 76.12,
@@ -415,7 +424,8 @@
       "vmaf_min": 73.57,
       "vmaf_p99": 77.41,
       "frames": 720,
-      "wall_s": 54.74
+      "vmaf_basis": "pooled",
+      "wall_s": 58.86
     },
     "432p": {
       "vmaf_mean": 59.61,
@@ -423,9 +433,10 @@
       "vmaf_min": 57.69,
       "vmaf_p99": 60.33,
       "frames": 720,
-      "wall_s": 51.9
+      "vmaf_basis": "pooled",
+      "wall_s": 51.97
     }
   },
   "verify": [],
-  "total_wall_s": 359.11
+  "total_wall_s": 363.93
 }

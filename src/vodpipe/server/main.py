@@ -39,7 +39,7 @@ from .models import HealthOut, JobIn, JobOut
 app = FastAPI(
     title="vodpipe",
     description="VOD transcoding: NVENC ladder, CMAF HLS/DASH, watermarking, VMAF.",
-    version="1.0.4",
+    version="1.0.5",
 )
 
 # The Redis client factory lives with the worker (tasks.state_client); the API

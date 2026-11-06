@@ -34,6 +34,35 @@ def hls_url(job_id: str) -> str:
     return media_url(job_id, "hls/master.m3u8")
 
 
+def job_meta(*, ffmpeg: str, encoder: str, preset: str | None, nchunks: int,
+             workers: int, source: str, duration: float, gpurep: dict | None,
+             watermark: dict | None, rungs: list[str] | None = None) -> dict:
+    """The `meta` block, built one way for every report producer.
+
+    The CLI and the queue worker used to hand-assemble this dict and had drifted
+    apart: the CLI wrote `chunks: 1` (an int) and `preset: null` (the argument
+    it was passed, not the per-backend default it actually used), while the
+    worker wrote `chunks: [n, w]` or None. One report contract must not carry
+    two shapes for the same field, or the status page and `vodpipe report` can
+    disagree about a job. `preset` is therefore the *effective* preset and
+    `chunks` is `[n, w]` only when the job was really chunked. Key order matches
+    the committed `bench/m4_*.json` so the worker output is unchanged.
+    """
+    meta: dict[str, Any] = {
+        "ffmpeg": ffmpeg,
+        "encoder": encoder,
+        "preset": preset,
+        "chunks": [nchunks, workers] if nchunks > 1 else None,
+        "source": source,
+        "duration": duration,
+        "gpu": gpurep,
+        "watermark": watermark,
+    }
+    if rungs is not None:
+        meta["rungs"] = rungs
+    return meta
+
+
 def build_report(job_id: str, meta: dict, encode: list[dict], ladder_wall_s: float,
                  packaging: dict, vmaf: dict, verify: list[dict],
                  total_wall_s: float) -> dict:

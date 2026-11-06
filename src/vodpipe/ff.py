@@ -294,8 +294,8 @@ class EncoderHelp:
 
 
 def probe_args(path: str, entries: Sequence[str], select: str | None = None,
-               count_packets: bool = False, out_format: str = "json") -> list[str]:
-    args = [ffprobe(), "-v", "error", "-print_format", out_format]
+               count_packets: bool = False) -> list[str]:
+    args = [ffprobe(), "-v", "error", "-print_format", "json"]
     if select:
         args += ["-select_streams", select]
     if count_packets:

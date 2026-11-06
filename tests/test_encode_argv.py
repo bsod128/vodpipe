@@ -105,6 +105,27 @@ def test_chunked_encode_uses_the_same_rate():
     assert flag_value(argv, "-ss") == "0.0"
 
 
+def test_chunk_pins_video_to_an_exact_frame_count():
+    # A float `-t` trim keeps a frame only if it lands strictly inside a
+    # half-open time interval, so a sub-frame cut silently drops one. The exact
+    # `-frames:v` is what the concat check is accountable to.
+    src, r, enc = make_source(24.0, 24.0), rung("1080p"), encoders.build("libx264")
+    argv = encode.chunk_args(src, r, enc, 3.4286, 6.8571, "c1.ts")
+    assert flag_value(argv, "-frames:v") == str(encode.chunk_frames(src, r, 3.4286, 6.8571))
+    assert encode.chunk_frames(src, r, 3.4286, 6.8571) == round(6.8571 * 24) - round(3.4286 * 24)
+
+
+def test_chunk_frame_counts_telescope_to_the_whole_file():
+    # Whatever the borders, summing the per-chunk frame counts must equal the
+    # expectation verify() compares against - the boundaries have to cancel.
+    from vodpipe import ts
+    src, r = make_source(30.0, 24.0), rung("720p")
+    n = 7
+    edges = [round(i * 24 * 30 / n) / 30 for i in range(n + 1)]
+    total = sum(encode.chunk_frames(src, r, edges[i], edges[i + 1]) for i in range(n))
+    assert total == ts.expected_video_frames(24.0, encode.out_fps(src, r))
+
+
 def test_whole_and_chunked_share_rate_control_and_gop():
     src, r, enc = make_source(24.0), rung("1080p"), encoders.build("h264_nvenc")
     whole = encode.whole_args(src, r, enc, "a.ts")

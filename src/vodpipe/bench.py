@@ -55,10 +55,24 @@ class Selection:
 
     @staticmethod
     def parse(rungs: str, configs: str) -> Selection:
+        """Parse and validate the requested matrix slice.
+
+        Configs are checked against `MATRIX` for the same reason `pick_rungs`
+        validates labels: a benchmark that quietly drops a typo'd config and
+        exits 0 prints a shorter table than it was asked for, and the reader has
+        no way to know a row is missing.
+        """
+        wanted = [c.strip() for c in configs.split(",") if c.strip()]
+        if "all" in wanted:
+            wanted = sorted({c[0] for c in MATRIX})
+        known = {c[0] for c in MATRIX}
+        unknown = [c for c in wanted if c not in known]
+        if unknown:
+            raise ValueError(f"unknown config(s): {', '.join(unknown)}; "
+                             f"choose from {', '.join(sorted(known))} or 'all'")
         return Selection(
             rungs=[r.strip() for r in rungs.split(",") if r.strip()],
-            configs=(sorted({c[0] for c in MATRIX}) if configs == "all"
-                     else [c.strip() for c in configs.split(",") if c.strip()]),
+            configs=wanted,
         )
 
 
@@ -127,6 +141,31 @@ def with_speedup(rows: list[dict]) -> list[dict]:
         if base and base["wall_s"]:
             r["vs_x264"] = round(base["wall_s"] / r["wall_s"], 2)
     return rows
+
+
+def noise_runs(src: probe.Source, work: str, sel: Selection, repeats: int,
+               runner: ff.Runner | None = None) -> list[dict]:
+    """Run the selected matrix `repeats` times and report per-(rung, tag) spread.
+
+    This is not a second measurement method: each repeat goes through the same
+    `run_matrix` encode path, so the spread it reports is the spread of the very
+    numbers the M2 table quotes. Wall time is the only quantity kept - the point
+    is run-to-run variance, not another throughput figure. Spread is
+    `(max-min)/min`, so "0.8%" reads as "these two runs differ by less than 1%".
+    """
+    walls: dict[tuple[str, str], list[float]] = {}
+    for _ in range(max(1, repeats)):
+        for r in run_matrix(src, work, sel, do_vmaf=False, runner=runner):
+            walls.setdefault((r["rung"], r["tag"]), []).append(r["wall_s"])
+    out: list[dict] = []
+    for (rung, tag), vals in walls.items():
+        lo = min(vals)
+        hi = max(vals)
+        spread = round((hi - lo) / lo * 100, 1) if lo else 0.0
+        out.append({"rung": rung, "tag": tag, "repeats": len(vals),
+                    "runs_s": vals, "min_s": lo, "max_s": hi, "spread_pct": spread})
+    out.sort(key=lambda d: (d["rung"], d["tag"]))
+    return out
 
 
 def two_pass(src: probe.Source, rung: Rung, enc: encoders.Encoder, out: str, work: str,

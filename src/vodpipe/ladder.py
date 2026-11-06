@@ -31,7 +31,7 @@ class Rung:
     bitrate: int      # target video bitrate, bit/s
     maxrate: int      # VBV peak
     bufsize: int      # VBV buffer, seconds worth of bits at maxrate
-    devices: str = ""  # who this rung is for (documentation, ends up in reports)
+    devices: str = ""  # who this rung is for (documentation only)
     max_fps: int = 30
     audio: int = 128_000
 
@@ -55,7 +55,7 @@ class Rung:
             w = int(round(src_w * h / src_h / 2) * 2)
         return f"scale={w}:{h}:flags=lanczos"
 
-def ladder(target_heights: list[int] | None = None) -> list[Rung]:
+def ladder() -> list[Rung]:
     """The reference 4K ladder.
 
     Bitrates are VBR targets chosen for a mixed film/TV catalogue: the top rung
@@ -75,9 +75,6 @@ def ladder(target_heights: list[int] | None = None) -> list[Rung]:
         Rung("432p", 432, 768, 1_400_000, 1_800_000, 2_200_000,
              devices="mobile 3G, weak connections"),
     ]
-    if target_heights:
-        wanted = set(target_heights)
-        rungs = [r for r in rungs if r.height in wanted]
     return sorted(rungs, key=lambda r: -r.height)
 
 

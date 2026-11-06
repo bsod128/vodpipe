@@ -116,7 +116,7 @@ def resolve_source(source: str | None, default: str, media_root: str) -> str:
         src = os.path.join(media_root, src)
     src = os.path.normpath(src)
     root = os.path.normpath(media_root)
-    if os.path.commonpath([src, root]) != root:
+    if not is_inside(src, root):
         raise ValueError("source must live inside the media root")
     return os.path.relpath(src, root)
 
@@ -144,7 +144,7 @@ def rung_summary(results: list[dict], vmaf: dict | None = None) -> list[dict]:
             "mode": r.get("mode"),
             "wall_s": r.get("wall_s"),
             "speed_x": r.get("speed_x"),
-            "measured_kbps": measured.get("video_kbps") or measured.get("bitrate_kbps"),
+            "measured_kbps": measured.get("video_kbps"),
         }
         if r.get("cancelled"):
             row["mode"] = "cancelled"

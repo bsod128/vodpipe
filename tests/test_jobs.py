@@ -145,6 +145,21 @@ def test_worker_argv_uses_threads_on_windows_and_one_slot_anywhere():
         assert "-P" in argv and argv[argv.index("-P") + 1] == "threads"
 
 
+def test_failed_integrity_flags_only_a_broken_chunked_rung():
+    """The worker turns a non-empty result here into a FAILURE. Whole-file rungs
+    carry no check, and a passing chunk must not trip the gate."""
+    pytest.importorskip("celery")
+    from vodpipe.server import tasks
+
+    assert tasks.failed_integrity([]) == []
+    assert tasks.failed_integrity([{"rung": "1080p", "ok": True, "vpkts": 720}]) == []
+    bad = tasks.failed_integrity([
+        {"rung": "1080p", "ok": True, "vpkts": 720},
+        {"rung": "720p", "ok": False, "vpkts": 719, "expected_frames": 720},
+    ])
+    assert [c["rung"] for c in bad] == ["720p"]
+
+
 def test_report_contract_carries_verify_and_no_local_paths(monkeypatch, tmp_path):
     """The contract the client's `job` command reads: rungs plus the integrity
     verdict. Paths must be public in the written report, because it ships to

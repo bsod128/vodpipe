@@ -173,6 +173,8 @@ def test_malformed_job_ids_are_404_not_a_backend_probe(bad_id, job_tree):
     reaches a filesystem path or a Redis key."""
     client = testclient.TestClient(main.app)
     assert client.get(f"/media/{bad_id}/hls/seg_00001.m4s").status_code == 404
+    assert client.get(f"/jobs/{bad_id}").status_code == 404
+    assert client.post(f"/jobs/{bad_id}/cancel").status_code == 404
     assert client.get(f"/jobs/{bad_id}/report").status_code == 404
 
 

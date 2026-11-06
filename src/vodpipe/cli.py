@@ -26,7 +26,7 @@ import time
 from . import bench as bench_mod
 from . import ff, figures, gpu, probe, report, sample
 from . import pipeline as pl
-from .encoders import BACKENDS
+from .encoders import BACKENDS, validate_preset
 from .ladder import select as select_rungs
 from .ladder import validate
 from .watermark import is_safe_id
@@ -47,10 +47,16 @@ def _print_json(obj) -> None:
 
 def cmd_doctor(_: argparse.Namespace) -> int:
     print("ffmpeg:", end=" ")
-    try:
-        h = ff.health()
-    except ff.FFmpegNotFound as exc:
-        print(f"MISSING ({exc})")
+    h = ff.health()
+    # health() reports a missing binary as ffmpeg="missing" instead of raising,
+    # so the encoders/filters maps come back empty. Printing them would read as
+    # "no encoders" and "all filters present" - both wrong, and confusing on the
+    # one command a fresh checkout is told to run first. Say the real problem and
+    # stop.
+    if h.ffmpeg == "missing":
+        print("MISSING")
+        print(f"  {h.detail}")
+        print("  install ffmpeg 7+ or set VODPIPE_FFMPEG / VODPIPE_FFPROBE")
         return 1
     print(h.version)
     print(f"binary: {h.ffmpeg}")
@@ -125,8 +131,12 @@ def cmd_demo(args: argparse.Namespace) -> int:
             print(f"refusing watermark id {args.watermark!r}: use [A-Za-z0-9_.:@#-]")
             return 2
 
-    work = os.path.join(WORK, "demo")
-    out = os.path.join(OUT, "demo")
+    # Everything is keyed by the report's basename, so one command shape writes
+    # either the whole-file ladder (demo.json) or a chunked one
+    # (m1_h264_nvenc_chunk8.json) without their work/ or out/ dirs colliding.
+    stem = os.path.splitext(args.report)[0]
+    work = os.path.join(WORK, stem)
+    out = os.path.join(OUT, stem)
     pipe = pl.Pipeline(args.src, work, wm_spec=wm_spec)
     print("source:", pipe.src.summary())
     if not pipe.src.is_4k():
@@ -136,10 +146,16 @@ def cmd_demo(args: argparse.Namespace) -> int:
         done = sum(r.get("wall_s", 0) for r in results)
         print(f"    progress {i}/{n} rungs, {done:.1f}s of encode so far")
 
+    # The effective preset: what the encoder actually used, not the raw argument
+    # (which is None when the caller let the backend choose). Reports must state
+    # the command that was really run.
+    eff_preset = validate_preset(args.encoder, args.preset)
+    workers = args.workers or args.chunks
+
     t0 = time.perf_counter()
     results, wall = pipe.run_ladder(encoder=args.encoder, preset=args.preset,
-                                    nchunks=args.chunks, workers=args.chunks,
-                                    tag="demo", rungs=rungs, on_rung_done=progress)
+                                    nchunks=args.chunks, workers=workers,
+                                    tag=stem, rungs=rungs, on_rung_done=progress)
     print(f"ladder wall = {wall:.1f}s")
 
     verify = pipe.verify(results)
@@ -154,17 +170,19 @@ def cmd_demo(args: argparse.Namespace) -> int:
               len(pkg["dash"]["representations"]), "DASH representations")
         print("ladder from manifest:", pkg["ladder"]["ladder"])
 
-    vmaf = {} if args.no_vmaf else pipe.vmaf_for(results, tag="demo_")
+    vmaf = {} if args.no_vmaf else pipe.vmaf_for(results, tag=stem + "_")
     total = round(time.perf_counter() - t0, 2)
 
     rep = report.build_report(
-        job_id="demo",
-        meta={"ffmpeg": ff.version(), "encoder": args.encoder, "preset": args.preset,
-              "chunks": args.chunks, "source": pipe.src.summary(), "gpu": gpurep,
-              "watermark": wm_spec, "rungs": [r.label for r in rungs]},
+        job_id=stem,
+        meta=report.job_meta(ffmpeg=ff.version(), encoder=args.encoder,
+                             preset=eff_preset, nchunks=args.chunks, workers=workers,
+                             source=pipe.src.summary(), duration=pipe.src.duration,
+                             gpurep=gpurep, watermark=wm_spec,
+                             rungs=[r.label for r in rungs]),
         encode=results, ladder_wall_s=wall, packaging=pkg, vmaf=vmaf, verify=verify,
         total_wall_s=total)
-    path = report.dump(os.path.join(BENCH, "demo.json"), report.sanitize(rep, ROOT))
+    path = report.dump(os.path.join(BENCH, args.report), report.sanitize(rep, ROOT))
     print("report ->", report.to_repo_relative(path, ROOT))
     return 0
 
@@ -185,6 +203,9 @@ def cmd_bench(args: argparse.Namespace) -> int:
     sel = bench_mod.Selection.parse(args.rungs, args.configs)
     work = os.path.join(WORK, "m2")
     os.makedirs(work, exist_ok=True)
+
+    if args.repeats > 1:
+        return _cmd_bench_noise(args, src, gpurep, sel, work)
     t0 = time.perf_counter()
     rows = bench_mod.run_matrix(src, work, sel, do_vmaf=args.vmaf)
     rep = {
@@ -198,6 +219,30 @@ def cmd_bench(args: argparse.Namespace) -> int:
     for r in rows:
         if "vs_x264" in r:
             print(f"  [{r['rung']:>5}] {r['tag']:<18} x{r['vs_x264']}")
+    print("report ->", report.to_repo_relative(path, ROOT))
+    return 0
+
+
+def _cmd_bench_noise(args: argparse.Namespace, src, gpurep, sel, work) -> int:
+    """Repeat the matrix and publish the run-to-run spread, not an average.
+
+    Every README comparison against measurement noise points at this file, so it
+    has to be a committed artifact like the rest, not a number quoted from a
+    throwaway run.
+    """
+    t0 = time.perf_counter()
+    rows = bench_mod.noise_runs(src, work, sel, repeats=args.repeats)
+    rep = {
+        "meta": {"ffmpeg": ff.version(), "source": src.summary(), "gpu": gpurep,
+                 "configs": sel.configs, "rungs": sel.rungs, "repeats": args.repeats,
+                 "total_wall_s": round(time.perf_counter() - t0, 1)},
+        "rows": rows,
+    }
+    path = report.dump(os.path.join(BENCH, "m2_noise.json"), report.sanitize(rep, ROOT))
+    print("\nrun-to-run wall spread:")
+    for r in rows:
+        print(f"  [{r['rung']:>5}] {r['tag']:<18} {r['min_s']:>6}-{r['max_s']} s "
+              f"spread {r['spread_pct']}%")
     print("report ->", report.to_repo_relative(path, ROOT))
     return 0
 
@@ -376,6 +421,10 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--rungs", default="2160p,1440p,1080p,720p,432p")
     d.add_argument("--chunks", type=int, default=1,
                    help="parallel chunks (1 = whole file; >1 only helps across GPUs)")
+    d.add_argument("--workers", type=int, default=None,
+                   help="parallel workers (defaults to --chunks)")
+    d.add_argument("--report", default="demo.json",
+                   help="report file name under bench/ (also keys the work/out dirs)")
     d.add_argument("--watermark", default=None, help="viewer id to burn in")
     d.add_argument("--ghost", action="store_true", help="add the near-invisible layer")
     d.add_argument("--no-vmaf", action="store_true")
@@ -387,6 +436,9 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--rungs", default="2160p,1080p,720p")
     b.add_argument("--configs", default="all")
     b.add_argument("--vmaf", action="store_true")
+    b.add_argument("--repeats", type=int, default=1,
+                   help="run the matrix N times and write the run-to-run wall "
+                        "spread to bench/m2_noise.json instead of m2_bench.json")
     b.add_argument("--min-free-gb", type=float, default=6.0)
     b.set_defaults(func=cmd_bench)
 

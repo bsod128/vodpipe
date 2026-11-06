@@ -78,20 +78,22 @@ HLS master playlist (BANDWIDTH is audio+video, which is what a player sees):
 
 | Rung | wall, s | speed | delivered bitrate | VMAF mean | VMAF min |
 |---|---|---|---|---|---|
-| 2160p | 29.7 | 0.82x | 31 656 kbps | 94.90 | 93.37 |
-| 1440p | 13.8 | 1.79x | 12 319 kbps | 87.14 | 85.90 |
+| 2160p | 29.8 | 0.82x | 31 656 kbps | 94.90 | 93.37 |
+| 1440p | 14.0 | 1.78x | 12 319 kbps | 87.14 | 85.90 |
 | 1080p | 9.3 | 2.71x | 7 485 kbps | 82.16 | 80.82 |
-| 720p | 5.8 | 4.48x | 3 680 kbps | 76.12 | 73.57 |
-| 432p | 4.8 | 5.47x | 1 625 kbps | 59.61 | 57.69 |
+| 720p | 5.9 | 4.44x | 3 680 kbps | 76.12 | 73.57 |
+| 432p | 4.5 | 5.89x | 1 625 kbps | 59.61 | 57.69 |
 
-Ladder wall time: **63.4 s** for five rungs, VMAF from 94.90 down to 59.61.
+Ladder wall time: **63.5 s** for five rungs, VMAF from 94.90 down to 59.61.
 Artifact: [`bench/demo.json`](bench) (`vodpipe demo`, whole-file encoding).
 
 The same ladder through the chunked path (8 chunks, 4 workers) is kept as
-[`bench/m1_h264_nvenc_chunk8.json`](bench): **82.6 s** ladder wall. Chunking cost
-~19 s here and added a concat step - the M2 result again, at ladder scale. VMAF
-per rung is identical to within 0.05, as it should be: splitting the work must
-not change what is encoded, only how it is split.
+[`bench/m1_h264_nvenc_chunk8.json`](bench): **80.9 s** ladder wall. Chunking cost
+~17 s here and added a concat step - the M2 result again, at ladder scale. VMAF
+mean per rung is identical to within 0.05, as it should be: splitting the work
+must not change what is encoded, only how it is split. Every chunked rung
+reports `vpkts=720/720` in the report's `verify` list, so the concat is checked
+against the exact frame count, not against ffprobe's duration guess.
 
 ![M1 time and bitrate](docs/figures/m1_time_bitrate.svg)
 ![M1 VMAF](docs/figures/m1_vmaf.svg)
@@ -109,20 +111,23 @@ chunked with 2x2 / 4x4 / 8x8 workers:
 
 Chunking does not give a meaningful speedup on one card. At 2160p it only costs
 time (+3.9% at 2x2, up to +23% at 8x8). At 1080p and 720p the 2x2 row lands
-inside measurement noise of whole-file (a 3-repeat run put whole at 5.86-6.08 s
-and 2x2 at 5.72-5.86 s at 720p - a 1-3% edge, under the 3.8% run-to-run spread),
-so at most a rounding-error win, and it reverses as workers increase. The
-per-process throughput does go up, which is why a benchmark that reports only
-"speed" would have called it a win: the code reports `wall_s` and `agg_speed_x`
-separately, because wall time is what a user waits for.
+inside measurement noise of whole-file: a 3-repeat run put 720p whole-file at
+5.87-6.05 s and 2x2 at 5.84-5.91 s - a range that overlaps, and the 2x2 edge is
+under whole-file's own 3.1% run-to-run spread. So at most it is a rounding-error
+win, and it reverses as workers increase. The per-process throughput does go up,
+which is why a benchmark that reports only "speed" would have called it a win:
+the code reports `wall_s` and `agg_speed_x` separately, because wall time is what
+a user waits for.
 
-That noise is measured, not assumed. NVENC wall times repeat to 0.8-1.3% across
-runs; x264 scatters up to 15.5% (it is CPU-bound, and the machine is not
-idle). So every NVENC-vs-NVENC comparison below ~4% is read as a tie, and this
-table is a single run, not an average - quoting it to one decimal is the honest
-limit of what one machine can claim.
+That noise is measured, not assumed: a 3-repeat run of this same matrix gives the
+spread of the very numbers in the table above. NVENC wall times repeat to
+0.1-3.1% across runs; x264 scatters up to 9.9% (it is CPU-bound, and the machine
+is not idle). So every NVENC-vs-NVENC comparison below ~4% is read as a tie, and
+this table is a single run, not an average - quoting it to one decimal is the
+honest limit of what one machine can claim.
 
-Artifact: [`bench/m2_bench.json`](bench).
+Artifacts: [`bench/m2_bench.json`](bench) (the table),
+[`bench/m2_noise.json`](bench) (the 3-repeat spread behind the tie calls).
 
 ![M2 scaling](docs/figures/m2_scaling.svg)
 

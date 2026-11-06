@@ -1,0 +1,175 @@
+{
+  "meta": {
+    "ffmpeg": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "source": "3840x2160@30.0 h264+aac, 24.00 s, 217704 kbps, IDR: 8",
+    "gpu": {
+      "codec": "h264_nvenc",
+      "cards": [
+        {
+          "index": 4,
+          "name": "NVIDIA GeForce RTX 3060",
+          "used": 2498,
+          "total": 12288,
+          "util": 21,
+          "nvenc": true,
+          "reason": "ok"
+        },
+        {
+          "index": 3,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16053,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 000002b1ad1579c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000002b1ad1579c0] No capable device"
+        },
+        {
+          "index": 1,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16101,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 000001dc42cf79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001dc42cf79c0] No capable device"
+        },
+        {
+          "index": 2,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16101,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 000001d5ff4779c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 000001d5ff4779c0] No capable device"
+        },
+        {
+          "index": 0,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16159,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[h264_nvenc @ 00000248537179c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [h264_nvenc @ 00000248537179c0] No capable device"
+        }
+      ],
+      "picked": 4
+    },
+    "configs": [
+      "x264_medium_whole",
+      "nvenc_p5_whole",
+      "nvenc_p5_c2w2",
+      "nvenc_p5_c4w4"
+    ],
+    "rungs": [
+      "2160p",
+      "720p"
+    ],
+    "repeats": 3,
+    "total_wall_s": 499.9
+  },
+  "rows": [
+    {
+      "rung": "2160p",
+      "tag": "nvenc_p5_c2w2",
+      "repeats": 3,
+      "runs_s": [
+        30.99,
+        30.83,
+        30.9
+      ],
+      "min_s": 30.83,
+      "max_s": 30.99,
+      "spread_pct": 0.5
+    },
+    {
+      "rung": "2160p",
+      "tag": "nvenc_p5_c4w4",
+      "repeats": 3,
+      "runs_s": [
+        32.34,
+        32.26,
+        31.87
+      ],
+      "min_s": 31.87,
+      "max_s": 32.34,
+      "spread_pct": 1.5
+    },
+    {
+      "rung": "2160p",
+      "tag": "nvenc_p5_whole",
+      "repeats": 3,
+      "runs_s": [
+        30.26,
+        30.28,
+        30.3
+      ],
+      "min_s": 30.26,
+      "max_s": 30.3,
+      "spread_pct": 0.1
+    },
+    {
+      "rung": "2160p",
+      "tag": "x264_medium_whole",
+      "repeats": 3,
+      "runs_s": [
+        38.83,
+        38.53,
+        42.25
+      ],
+      "min_s": 38.53,
+      "max_s": 42.25,
+      "spread_pct": 9.7
+    },
+    {
+      "rung": "720p",
+      "tag": "nvenc_p5_c2w2",
+      "repeats": 3,
+      "runs_s": [
+        5.91,
+        5.87,
+        5.84
+      ],
+      "min_s": 5.84,
+      "max_s": 5.91,
+      "spread_pct": 1.2
+    },
+    {
+      "rung": "720p",
+      "tag": "nvenc_p5_c4w4",
+      "repeats": 3,
+      "runs_s": [
+        6.28,
+        6.36,
+        6.44
+      ],
+      "min_s": 6.28,
+      "max_s": 6.44,
+      "spread_pct": 2.5
+    },
+    {
+      "rung": "720p",
+      "tag": "nvenc_p5_whole",
+      "repeats": 3,
+      "runs_s": [
+        5.97,
+        6.05,
+        5.87
+      ],
+      "min_s": 5.87,
+      "max_s": 6.05,
+      "spread_pct": 3.1
+    },
+    {
+      "rung": "720p",
+      "tag": "x264_medium_whole",
+      "repeats": 3,
+      "runs_s": [
+        9.54,
+        10.48,
+        9.71
+      ],
+      "min_s": 9.54,
+      "max_s": 10.48,
+      "spread_pct": 9.9
+    }
+  ]
+}

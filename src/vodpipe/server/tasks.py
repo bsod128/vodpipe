@@ -78,6 +78,13 @@ def _pick_gpu(encoder: str) -> dict | None:
     return rep
 
 
+def failed_integrity(checks: list) -> list[dict]:
+    """Rungs whose frame-count check failed. `ok: false` means the concat lost or
+    duplicated frames, so that rendition is not correct. Whole-file rungs emit no
+    checks, so only a chunked job can produce a non-empty result."""
+    return [c for c in checks if c.get("ok") is False]
+
+
 def build_payload(*, job_id: str, cancelled: bool, encoder: str, preset: str | None,
                   nchunks: int, workers: int, source_summary: str, duration: float,
                   gpurep: dict | None, watermark: dict | None, results: list,
@@ -93,16 +100,9 @@ def build_payload(*, job_id: str, cancelled: bool, encoder: str, preset: str | N
     return {
         "job_id": job_id,
         "cancelled": cancelled,
-        "meta": {
-            "ffmpeg": ff.version(),
-            "encoder": encoder,
-            "preset": preset,
-            "chunks": [nchunks, workers] if nchunks > 1 else None,
-            "source": source_summary,
-            "duration": duration,
-            "gpu": gpurep,
-            "watermark": watermark,
-        },
+        "meta": report.job_meta(ffmpeg=ff.version(), encoder=encoder, preset=preset,
+                                nchunks=nchunks, workers=workers, source=source_summary,
+                                duration=duration, gpurep=gpurep, watermark=watermark),
         "encode": results,
         "ladder_wall_s": wall,
         "packaging": pkg,
@@ -230,6 +230,18 @@ def transcode(self, job_id: str, spec: dict) -> dict:
     pkg = vmaf = None
     if should_cancel():
         return finish()
+
+    # Integrity is a gate, not a footnote. A chunked rung whose concatenated
+    # packet count is wrong has lost (or duplicated) frames, so its output is
+    # not a correct rendition no matter how fast it encoded; shipping it as
+    # SUCCESS is worse than failing. Whole-file rungs produce no checks, so
+    # only the chunked path can trip here. A cancelled job returns above and
+    # is judged by its own "keep what finished, flagged" rule.
+    bad = failed_integrity(checks)
+    if bad:
+        detail = ", ".join(f"{c['rung']} {c.get('vpkts')}!={c.get('expected_frames')}"
+                           for c in bad)
+        raise RuntimeError(f"chunk integrity check failed: {detail}")
 
     progress(0.65, "package", finished)
     pkg = p.package(finished, out_dir, seg_dur=float(spec.get("seg_dur", 4.0)))

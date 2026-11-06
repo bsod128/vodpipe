@@ -34,7 +34,7 @@ artifact.
   sample: reproducible, and no licensing question about the source.
 
 ### Measured
-- Ladder of 5 rungs on 4K: 82.6 s wall chunked (63.4 s whole-file), VMAF 94.88 (2160p)
+- Ladder of 5 rungs on 4K: 80.9 s wall chunked (63.5 s whole-file), VMAF 94.88 (2160p)
   to 59.63 (432p) on the chunked run.
 - NVENC vs x264-medium: only 1.4-1.7x on this GPU, not the 10x folklore.
 - Chunking on one GPU gives no real speedup (2160p: 29.6 s whole, 36.3 s at 8x8) -
@@ -319,3 +319,82 @@ falls back to a uniform grid. It did not, and measuring it found the reason.
 - `test_uniform_grid_is_frame_aligned_when_fps_given` - the regression: every grid
   boundary is a whole frame, and the spans sum back to `round(duration * fps)`.
 - 190 tests (189 pass, 1 skips without a GPU).
+
+## 1.0.5 - a final review pass: frame-exact trim, a reproducible master, committed noise
+
+A read-only review of the whole tree (not my own diff) found three findings worth
+the name MAJOR and seven smaller ones. All are fixed; each was reproduced against
+real ffmpeg output first, because three of them were "the docs claim more than the
+artifacts support", which is the one failure mode this repo cannot afford.
+
+### Fixed
+- **The chunk trim was a rounded duration, not an exact frame count.** `plan_chunks`
+  now cuts on whole frames, but `chunk_args` still asked ffmpeg to keep
+  `round(duration, 4)` seconds, and a `-t`/duration trim keeps a frame only when it
+  lands strictly inside a half-open interval - so the boundary frame survived or was
+  dropped depending on the exact `(frame, fps)` pair. It happened to be right for the
+  benchmarked 30 fps but is luck, and luck is what the packet check exists to catch.
+  `chunk_args` now emits `-frames:v` computed from *absolute* boundaries
+  (`round(end*fps) - round(start*fps)`), which telescopes to exactly
+  `ts.expected_video_frames` whatever the borders are. Measured end to end on
+  generated masters at 24/25/30/23.976 fps over both the keyframe path and the
+  uniform-grid fallback: 11/11 configurations land on the exact frame count.
+- **A fresh `vodpipe master` did not reproduce the benchmarked source.** Every
+  committed artifact was measured on a 24 s master with 8 IDRs (a 3 s GOP), but
+  `sample.master_args` emitted `-g fps*2` (a 2 s GOP, 12 IDRs), so "reproducible from
+  an empty checkout" was not true. The master GOP is now 3 s and a test pins it
+  (plus its `-keyint_min` and the 8-IDR count) so it cannot silently drift again.
+- **The run-to-run noise the README leans on was not a committed artifact.** The
+  tie-versus-win argument for the M2 720p 2x2 row quoted spreads that no `bench/`
+  file carried, against the README's own "no estimates here". `vodpipe bench
+  --repeats N` now runs the *same* matrix N times and writes `bench/m2_noise.json`;
+  the README quotes those committed numbers (NVENC walls repeat to 0.1-3.1%, x264
+  scatters up to 9.9%).
+
+### Changed
+- Both report producers build `meta` through one `report.job_meta` helper. The CLI
+  and the worker had drifted apart on two fields: `chunks` (the CLI wrote an int, the
+  worker a list-or-None) and `preset` (the CLI wrote the argument it was passed,
+  which is `null`, not the per-backend default it actually used). They now agree, and
+  `demo` gained `--workers` and `--report` so a chunked ladder artifact is a CLI
+  invocation, not a hand-edited file. `bench/demo.json` and
+  `bench/m1_h264_nvenc_chunk8.json` were regenerated with the current code.
+- A chunked rung whose frame-count check fails now fails the job instead of shipping
+  a `SUCCESS` with a bad concat: `failed_integrity()` is the gate, and the worker
+  raises before packaging. Whole-file rungs emit no check, so only the chunked path
+  can trip it; a cancelled job is still judged by its own keep-what-finished rule.
+- `vodpipe doctor` on a machine with no ffmpeg printed `filters: all present` (the
+  maps were empty because `health()` reports a missing binary rather than raising)
+  and then died in a later probe. It now says the binary is missing, how to point the
+  tool at one, and exits non-zero - which is the one command a fresh checkout is
+  told to run first.
+- `bench Selection.parse` rejects a typo'd `--configs` instead of quietly running a
+  shorter matrix and exiting 0 - the same class the strict `--rungs` path closed.
+- `resolve_source` reuses `mediarange.is_inside` rather than a second `commonpath`
+  containment check: `commonpath` raises `ValueError` across drives on Windows, so a
+  `C:`-escaping source was a 500 where a clean reject is correct.
+
+### Removed
+- Parameters and fallbacks nothing produced or called: the `bitrate_kbps` fallback in
+  `rung_summary` (only `video_kbps` is ever written), `ladder(target_heights=...)`,
+  `ff.probe_args(out_format=...)`. The `devices` field's comment claimed it reaches
+  reports; it does not, so the comment now says documentation only.
+
+### Added
+- `test_encode_argv`: the trim is an exact `-frames:v`, and per-chunk frame counts
+  telescope to the whole-file expectation at non-zero, non-frame-aligned borders.
+- `test_sample`: the master's GOP, keyint and IDR count are pinned to the artifacts.
+- `test_bench`: strict `--configs` and the `noise_runs` spread; `test_jobs`:
+  `failed_integrity` flags only a broken chunked rung.
+- `test_server`: malformed ids now exercised on `GET /jobs/{id}` and
+  `POST /jobs/{id}/cancel` too, which the 1.0.3 release note described but the test
+  had not actually covered.
+- 200 tests (199 pass, 1 skips without a GPU).
+
+### Notes on method
+- The two "reproducibility" findings are the same mistake seen twice: a claim that a
+  committed artifact means more than it does. A 2 s-GOP master generator and a
+  "measured noise" sentence in the README were both true statements about work that
+  had been done once, locally, and were not the thing the artifact actually records.
+  Regenerating rather than re-wording is the only fix that keeps the repo's own
+  promise ("no estimates here") checkable.

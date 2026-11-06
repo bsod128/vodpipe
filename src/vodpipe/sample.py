@@ -36,7 +36,11 @@ def master_args(out: str, duration: float = 24.0, size: str = "3840x2160",
     structures (flat colour would let any encoder look good), a second gradient
     layer pans to create motion that rate control must chase, and `noise`
     emulates film grain, which is what actually exposes encoder differences.
-    IDR interval of 2 s matches `encoders.gop_args` so chunk boundaries exist.
+    The IDR interval is 3 s (8 keyframes over the 24 s master), not the 2 s of
+    `encoders.gop_args`: the renditions and the master are different streams with
+    different GOPs, and every committed `bench/` artifact was measured on this
+    3 s-GOP master, so a fresh `vodpipe master` has to rebuild exactly that shape
+    or the published numbers are no longer reproducible from a clean checkout.
     """
     graph = (
         f"testsrc2=size={size}:rate={fps}:duration={duration}:max_dropout=0.005,"
@@ -53,7 +57,7 @@ def master_args(out: str, duration: float = 24.0, size: str = "3840x2160",
         "-c:v", "libx264", "-preset", "veryfast", "-b:v", str(bitrate),
         "-maxrate:v", str(bitrate), "-bufsize:v", str(bitrate * 2),
         "-pix_fmt", "yuv420p",
-        "-g", str(fps * 2), "-keyint_min", str(fps * 2), "-sc_threshold", "0",
+        "-g", str(fps * 3), "-keyint_min", str(fps * 3), "-sc_threshold", "0",
         "-c:a", "aac", "-b:a", "192k", "-ac", "2",
         "-movflags", "+faststart",
         out,

@@ -105,7 +105,23 @@ def transcode_whole(src: Source, rung: Rung, enc: Encoder, out_path: str, wm: st
     }
 
 
-def chunk_args(src: Source, rung: Rung, enc: Encoder, start: float, duration: float,
+def chunk_frames(src: Source, rung: Rung, start: float, end: float) -> int:
+    """Exact output-video frame count for [start, end), on the rung's output grid.
+
+    Cut on absolute boundaries (`round(end*fps) - round(start*fps)`) rather than
+    on the span, so the per-chunk counts telescope to
+    `round(duration*fps)` = `ts.expected_video_frames` no matter where the borders
+    fall: the first boundary contributes 0 and the last is the whole file, so the
+    intermediate boundaries cancel. A `-t`/duration trim cannot promise this: it
+    asks ffmpeg to keep frames within a half-open time interval, and whether the
+    boundary frame survives depends on the exact `(frame, fps)` pair, so a
+    sub-frame trim silently drops a frame and the concat check false-fails.
+    """
+    fps = out_fps(src, rung)
+    return round(end * fps) - round(start * fps)
+
+
+def chunk_args(src: Source, rung: Rung, enc: Encoder, start: float, end: float,
                out_path: str, wm: str = "") -> list[str]:
     vf = VideoFilter(rung, src, wm).build()
     return [
@@ -113,12 +129,15 @@ def chunk_args(src: Source, rung: Rung, enc: Encoder, start: float, duration: fl
         # -ss BEFORE -i is a fast seek that lands on an IDR: accurate and cheap.
         # -ss AFTER -i decodes everything up to the cut (accurate but slow) and is
         # the wrong choice here because we already chose IDR boundaries.
-        "-ss", str(start), "-t", str(round(duration, 4)),
+        # -t bounds the AUDIO (which the frame check does not count); -frames:v
+        # pins the VIDEO to an exact frame count, see chunk_frames.
+        "-ss", str(start), "-t", str(round(end - start, 4)),
         "-i", src.path,
         "-vf", vf,
         *gop_args(out_fps(src, rung)),
         *enc.args(),
         *rate_args(rung),
+        "-frames:v", str(chunk_frames(src, rung, start, end)),
         *_output_args(rung, out_path),
     ]
 
@@ -126,7 +145,7 @@ def chunk_args(src: Source, rung: Rung, enc: Encoder, start: float, duration: fl
 def encode_chunk(src: Source, rung: Rung, enc: Encoder, start: float, end: float,
                  out_path: str, wm: str = "", runner: ff.Runner | None = None) -> dict:
     res = (runner or ff.Runner()).run(
-        chunk_args(src, rung, enc, start, end - start, out_path, wm))
+        chunk_args(src, rung, enc, start, end, out_path, wm))
     return {
         "start": start, "end": end,
         "speed_x": round(res.speed_x, 3), "wall_s": round(res.wall_s, 2),
