@@ -36,7 +36,8 @@ def hls_url(job_id: str) -> str:
 
 def job_meta(*, ffmpeg: str, encoder: str, preset: str | None, nchunks: int,
              workers: int, source: str, duration: float, gpurep: dict | None,
-             watermark: dict | None, rungs: list[str] | None = None) -> dict:
+             watermark: dict | None, rungs: list[str] | None = None,
+             fallback: str | None = None, fallback_preset: str | None = None) -> dict:
     """The `meta` block, built one way for every report producer.
 
     The CLI and the queue worker used to hand-assemble this dict and had drifted
@@ -47,6 +48,11 @@ def job_meta(*, ffmpeg: str, encoder: str, preset: str | None, nchunks: int,
     disagree about a job. `preset` is therefore the *effective* preset and
     `chunks` is `[n, w]` only when the job was really chunked. Key order matches
     the committed `bench/m4_*.json` so the worker output is unchanged.
+
+    A dual-codec run encodes two ladders into one manifest; `encoder` is the
+    primary (the rung clients prefer) and `fallback` the codec a client that
+    cannot decode it still gets. Only set when there really is a second codec, so
+    every single-codec artifact keeps its existing shape.
     """
     meta: dict[str, Any] = {
         "ffmpeg": ffmpeg,
@@ -60,6 +66,9 @@ def job_meta(*, ffmpeg: str, encoder: str, preset: str | None, nchunks: int,
     }
     if rungs is not None:
         meta["rungs"] = rungs
+    if fallback is not None:
+        meta["fallback"] = fallback
+        meta["fallback_preset"] = fallback_preset
     return meta
 
 

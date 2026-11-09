@@ -7,6 +7,7 @@ runnable on a GPU-less runner.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import shutil
 
@@ -23,6 +24,28 @@ def ffmpeg_available() -> bool:
         return True
     except ff.FFmpegNotFound:
         return False
+
+
+def ffmpeg_scratch_writable(path: str) -> bool:
+    """Whether ffmpeg itself can write a file into `path`.
+
+    A capability probe, like `ffmpeg_available`: tests that assert on what ffmpeg
+    produced need both the binary and somewhere to put it. A sandbox that lets the
+    Python process write a directory but denies the spawned ffmpeg is a real
+    environment here, and it is not a check that failed.
+    """
+    probe = os.path.join(path, "vodpipe-probe.ts")
+    try:
+        ff.Runner(timeout_s=60).run(
+            [ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "error",
+             "-f", "lavfi", "-i", "color=c=black:s=16x16:d=0.04", "-frames:v", "1",
+             probe], check=True)
+        return True
+    except Exception:
+        return False
+    finally:
+        with contextlib.suppress(OSError):
+            os.remove(probe)
 
 
 requires_ffmpeg = pytest.mark.skipif(

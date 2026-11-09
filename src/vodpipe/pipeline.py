@@ -72,6 +72,14 @@ class Pipeline:
                                            runner=self.runner)
             r["rung_res"] = f"{rung.width}x{rung.height}"
             r["target_kbps"] = rung.kbps
+            # What the encoder was asked to write, kept so packaging can
+            # re-assert it at the MP4 hop (`ts.normalize`). The fourcc that ends
+            # up in the manifest is read back from the file, not taken from here.
+            # Named `encoder_tag`, not `tag`: `tag` already means "matrix config
+            # label" in bench.py rows (`nvenc_p5_whole`) and in the figures that
+            # read them, and one JSON key meaning two unrelated things is how a
+            # chart silently starts plotting the wrong series.
+            r["encoder_tag"] = enc.tag
             results.append(r)
             print(f"  [{rung.label:>6}] {enc.name:<11} {r['mode']:<7} "
                   f"speed={r['speed_x']:>5.2f}x  wall={r['wall_s']:>6.1f}s")
@@ -118,33 +126,91 @@ class Pipeline:
 
     # ---------------------------------------------------------- packaging
     def package(self, results: list[dict], out_dir: str, seg_dur: float = 4.0) -> dict:
-        rungs: list[tuple[str, str]] = []
+        mp4s = self.normalize(results)
+        if not mp4s:
+            return {"hls": None, "dash": None, "ladder": {"variants": 0, "ladder": []}}
+        rungs = [(r["rung"], r["normalize"]["mp4"]) for r in mp4s]
+        return self._package_rungs(rungs, mp4s, out_dir, seg_dur)
+
+    def normalize(self, results: list[dict]) -> list[dict]:
+        """TS -> fragmented MP4 for every finished rung, in ladder order.
+
+        `ts.normalize` reads the fourcc and audio presence back from the file it
+        just wrote, so packaging decisions (which AdaptationSet a rendition joins,
+        whether HLS may state ``CODECS=``, which output stream index it occupies)
+        are made from what was really written, never from the encoder config.
+        """
+        out: list[dict] = []
         for r in results:
             if r.get("cancelled") or not r.get("out"):
                 continue
             mp4 = os.path.splitext(r["out"])[0] + ".mp4"
+            # MPEG-TS cannot carry the fourcc, so the remux re-derives it and HEVC
+            # lands as `hev1`. That costs the ladder its client-side fallback
+            # (HLS writes no CODECS= for hev1), so re-assert the encoder's tag.
             r["normalize"] = ts.normalize(r["out"], mp4, self.src.duration,
-                                          runner=self.runner)
-            rungs.append((r["rung"], mp4))
-        if not rungs:
+                                          tag=r.get("encoder_tag", ""), runner=self.runner)
+            out.append(r)
+        return out
+
+    def package_dual(self, primary: list[dict], fallback: list[dict], out_dir: str,
+                     seg_dur: float = 4.0) -> dict:
+        """One manifest carrying both codecs, primary's rungs first.
+
+        The point of a dual-codec ladder is that a client which cannot decode
+        H.265 still finds a complete H.264 ladder in the same master playlist,
+        so both groups go to a single packager invocation: two invocations
+        would produce two masters, and a client never sees the fallback.
+
+        Labels become ``<rung>_<encoder>`` because both ladders deliver the same
+        resolutions; the packager writes one variant file per label.
+        """
+        mp4s = self.normalize(primary) + self.normalize(fallback)
+        if not mp4s:
             return {"hls": None, "dash": None, "ladder": {"variants": 0, "ladder": []}}
-        hls = packager.package_hls(rungs, out_dir, seg_dur, runner=self.runner)
-        dash = packager.package_dash(rungs, out_dir, seg_dur, runner=self.runner)
+        rungs = [(packager.safe_label(f"{r['rung']}_{r['encoder']}"), r["normalize"]["mp4"])
+                 for r in mp4s]
+        labels = [label for label, _ in rungs]
+        if len(set(labels)) != len(labels):
+            raise ValueError(f"duplicate rendition label in {labels}")
+        return self._package_rungs(rungs, mp4s, out_dir, seg_dur)
+
+    def _package_rungs(self, rungs: list[tuple[str, str]], encoded: list[dict],
+                       out_dir: str, seg_dur: float) -> dict:
+        # Both packagers need audio presence, and both get it from the same read
+        # back off the written MP4: HLS because a silent rendition must not be
+        # given an `a:` selector (`packager.var_stream_map`), DASH because output
+        # stream indices shift when a rendition is silent
+        # (`packager.output_stream_index`).
+        audio = [r["normalize"]["has_audio"] for r in encoded]
+        families = [packager.codec_family(r["normalize"]["video_tag"]) for r in encoded]
+        hls = packager.package_hls(rungs, out_dir, seg_dur, runner=self.runner, audio=audio)
+        dash = packager.package_dash(rungs, out_dir, seg_dur, runner=self.runner,
+                                     families=families, audio=audio)
         return {"hls": hls, "dash": dash, "ladder": packager.manifest_stats(out_dir)}
 
     # ------------------------------------------------------------ metrics
-    def vmaf_for(self, results: list[dict], tag: str = "") -> dict:
+    def vmaf_for(self, results: list[dict], tag: str = "",
+                 key: Callable[[dict], str] | None = None) -> dict:
+        """VMAF per rendition.
+
+        `key` decides how a rendition is named in the result. It defaults to the
+        rung label, which is what every committed artifact uses; a dual-codec run
+        passes a codec-aware key because it delivers 1080p twice and the second
+        measurement would otherwise overwrite the first.
+        """
+        key = key or (lambda r: r["rung"])
         out: dict = {}
         for r in results:
             if r.get("cancelled") or not r.get("out"):
                 continue
             log = os.path.join(self.work, f"vmaf_{tag}{r['rung']}_{r['encoder']}.json")
-            out[r["rung"]] = metrics.vmaf(self.src.path, r["out"], log,
-                                          ref_size=self.src.resolution, runner=self.runner)
-            m = out[r["rung"]]
+            m = metrics.vmaf(self.src.path, r["out"], log,
+                             ref_size=self.src.resolution, runner=self.runner)
+            out[key(r)] = m
             if "error" in m:
-                print(f"  VMAF {r['rung']:>6}: {m['error']}")
+                print(f"  VMAF {key(r):>18}: {m['error']}")
             else:
-                print(f"  VMAF {r['rung']:>6} {r['encoder']:<11}: "
+                print(f"  VMAF {key(r):>18}: "
                       f"mean={m['vmaf_mean']} harm={m['vmaf_harmonic']} min={m['vmaf_min']}")
         return out

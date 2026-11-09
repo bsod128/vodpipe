@@ -17,8 +17,9 @@ artifact.
   the index is never hardcoded because it changes with the hardware config.
 - Chunked parallel path with concat, plus a packet-count integrity check
   (container duration is not trustworthy on concatenated TS).
-- CMAF packaging to HLS and DASH from one pass, with an HLS parser anchored on
-  the `NAME=` attribute.
+- CMAF packaging to HLS and DASH from one pass, with the HLS parser keyed on
+  `#EXT-X-STREAM-INF` (the entry tag) plus its required `BANDWIDTH`/`RESOLUTION`
+  attributes.
 - Watermarking as filter fragments inside the encode pass: static, drifting
   dynamic, and a near-invisible second layer.
 - VMAF with the distorted rendition upscaled to the reference size; mean, min,
@@ -398,3 +399,173 @@ artifacts support", which is the one failure mode this repo cannot afford.
   had been done once, locally, and were not the thing the artifact actually records.
   Regenerating rather than re-wording is the only fix that keeps the repo's own
   promise ("no estimates here") checkable.
+
+## 1.0.6 - a second codec in the same manifest
+
+The one thing the README promised to "finish and measure before an interview" was
+HEVC with an H.264 fallback. It is done and measured (M5), and getting two codecs
+into one master playlist turned up a latent defect that had been shipping
+silently since 1.0.0.
+
+### Fixed
+- **`-tag:v hvc1` never reached the output for the whole pipeline.** The encode
+  path writes MPEG-TS and `ts.normalize()` remuxes TS -> MP4 with `-c copy`; the
+  MP4 handler rebuilds the stream description from the elementary stream, which
+  for H.265 resolves to `hev1` regardless of what the encoder was commanded to
+  write. Measured on ffmpeg 7.1, both with and without `-tag:v hvc1` at encode
+  time: the remux always lands `hev1`. The consequence is not cosmetic: with
+  `hev1`, ffmpeg writes **no `CODECS=` attribute at all** for that HLS variant, so
+  a client cannot distinguish the HEVC rendition from an H.264 one and has no way
+  to choose a fallback. `encoders.hevc_nvenc()` had set `tag="hvc1"` since 1.0.0
+  with a comment asserting the fourcc matters for Apple and Smart TV - correct,
+  and provably inert. The fourcc is now re-asserted where the MP4 is written
+  (`ts.normalize_args(tag=...)`) and read back out of the finished file, so a
+  packaging decision can never be based on what the encoder was asked for rather
+  than on what the container says.
+- **`packager.ladder_from_hls` keyed the ladder by resolution alone.** Harmless
+  while every rung shared a codec; a mixed ladder delivers the same resolution
+  twice (720p HEVC plus 720p H.264 is exactly the fallback pair) and one of the
+  two renditions was silently dropped from the report. Labels are now
+  `<codec>_<resolution>`, and the DASH parser reads `codecs=` per Representation
+  (falling back to the parent AdaptationSet, which the spec also permits) so a
+  mixed-codec ladder is distinguishable when read back.
+- **`CHANGELOG` 1.0.0 described an HLS parser "anchored on the `NAME=` attribute"
+  that does not exist.** The parser keys on `#EXT-X-STREAM-INF` plus its required
+  `BANDWIDTH`/`RESOLUTION` attributes; the release note was corrected rather than
+  the code, because the code is right.
+- **HLS packaging aborted outright on a silent rendition** (found by review of this
+  same diff, reproduced with real ffmpeg before being fixed). `-var_stream_map`
+  emitted the rung index as both selectors, `v:N,a:N`, but HLS resolves them
+  against **separate per-code-type counters**: `a:N` is the Nth *audio* stream, not
+  output stream N. Because `map_args` maps audio with `?`, a ladder with one silent
+  rung has fewer audio streams than renditions, so the highest rung asked for an
+  audio stream that does not exist:
+  `[silent, audio, audio]` -> `Unable to map stream at a:2` -> `Could not write
+  header (incorrect codec parameters ?)`. An all-silent ladder failed at `a:0`.
+  Note that this diff had already discovered and fixed exactly this fact on the
+  DASH side (`output_stream_index`) - and then left the HLS side asserting the
+  opposite, which is also what `map_args`' own docstring claimed ("so a silent
+  master still packages"). A rendition with no audio now gets no `a:` part and is
+  packaged video-only. Verified against ffmpeg: `[audio, silent, audio]` packages
+  with rc=0, and the silent variant's `CODECS=` is `avc1.42c00d` while its
+  neighbours get `avc1.42c00d,mp4a.40.2`, which is the proof that the audio
+  ordinals bound to the intended renditions rather than to the shifted ones.
+- **`vodpipe figures` rendered silent garbage for a dual-codec report.** Two
+  independent keying mistakes in one function: bitrate was looked up by resolution
+  (a dual report delivers every resolution twice, so both ladders plotted one
+  bitrate) and VMAF by rung (but `cmd_demo` keys a dual run by `<rung>_<encoder>`,
+  so every lookup missed and every bar read 0). Charts still came out looking
+  well-formed. `--report` defaults to `demo.json`, so this sat on the default path.
+  The join now keys on the rendition label, recovered from the variant playlist URI
+  via the new `packager.variant_label`, which is the inverse of the naming
+  `package_hls` already uses - so the two sides agree by construction rather than by
+  a convention restated in a second place. The join is extracted as
+  `cli.ladder_rows` and asserted against a synthetic dual report; re-run against the
+  real artifact it reproduces all 20 numbers of the M5 table.
+- **`--fallback-preset` was silently ignored when `--fallback` was omitted** - the
+  run used the primary's preset and said nothing. All `demo` flag contradictions now
+  go through one pure `demo_arg_errors()` (same-family fallback, preset without a
+  fallback, unsafe watermark id), checked before any disk or GPU work; the watermark
+  check that used to live deep inside the command moved there too, so one guard
+  cannot drift from another.
+
+### Added
+- `vodpipe demo --encoder X --fallback Y`: encodes the ladder with both codecs and
+  packages them into **one** HLS master and one DASH manifest. Two packager
+  invocations would produce two masters, and a client never sees the second one.
+- `packager.codec_family` / `group_by_family` / `output_stream_index` /
+  `dash_adaptation_sets`: split a mixed-codec ladder into one video AdaptationSet
+  per codec family plus an audio set. Grouping is by family, not by codec string
+  (`avc1.640033` and `avc1.640015` belong in the same set; `avc1` and `hvc1` may
+  not). Output stream indices are computed from actual audio presence, because
+  `map_args` maps audio with `?` and a silent rendition shifts every later index -
+  counting `2*i` points at the wrong stream the moment one rung has no audio.
+- `ts.stream_tags`: video fourcc and audio presence in one ffprobe call, read from
+  the file packaging is about to consume.
+- `Pipeline.package_dual`, `report.job_meta(fallback=..., fallback_preset=...)`,
+  and `Pipeline.vmaf_for(key=...)` - the last because a dual run delivers 1080p
+  twice, and a VMAF map keyed by rung alone lets the fallback's number overwrite
+  the primary's.
+- `tests/test_ts.py` (new): the fourcc argv, `-tag:v` absent when no tag is asked
+  for (an empty value is an ffmpeg error), and the facts read back from the file.
+  The central claim - that MPEG-TS cannot carry `hvc1` and that re-asserting it at
+  the remux is what lands `hvc1` in the output - is now pinned by a test that runs
+  real ffmpeg (`libx265` into TS, remux twice, compare), rather than only asserting
+  that an argv string contains a flag.
+- `tests/test_dual_ladder.py` (new): the wiring nothing else covered - that
+  `normalize`'s read-back actually reaches the packager, that dual labels carry the
+  encoder, that two families become two video sets, that a silent rung gets no
+  `a:` selector **and** shifts the DASH indices of the family after it, and that
+  colliding labels raise instead of overwriting each other's playlists. Built on a
+  stubbed probe, so packaging is covered without a binary.
+- `tests/test_figures_join.py` and `tests/test_cli_args.py` (new): the report join
+  and the `demo` flag guards.
+- `conftest.ffmpeg_scratch_writable`: a capability probe, like the existing
+  `ffmpeg_available` / `requires_gpu` ones. Writing files with ffmpeg needs both
+  the binary and a scratch dir the *spawned process* may write - a sandbox that
+  lets the Python process write but denies ffmpeg is an environment that cannot run
+  the check, not a check that failed. Confirmed passing on a writable volume with
+  `pytest --basetemp=<writable>`.
+- `packager.variant_label`, `cli.ladder_rows`, `cli.demo_arg_errors`,
+  `ts.stream_tags` replaces the superseded `ts.video_tag` (which was dead in `src`
+  and invited a second probe that could read a different answer than the packager
+  used).
+- `run_ladder` records the encoder's requested fourcc as `encoder_tag`, not `tag`:
+  `tag` already means "matrix config label" (`nvenc_p5_whole`) in bench rows and in
+  the figures that read them, and one JSON key carrying two unrelated meanings is
+  how a chart starts plotting the wrong series.
+- 244 tests (2 skip without a GPU or a writable scratch dir).
+
+### Measured
+- One manifest, two codecs: 10 HLS variants / 60 segments / 20 DASH representations
+  in 3 AdaptationSets. Every HLS variant carries `CODECS=`; DASH advertises
+  `hvc1` and `avc1.640033` in separate sets. `bench/m5_hevc_fallback.json`.
+- HEVC is not measurably slower than H.264 on this GPU: per-rung wall time agrees
+  to within ~1% (2160p 30.2 s vs 30.2 s, ladder 64.3 s vs 64.4 s for five rungs).
+- Quality at matched bitrate is indistinguishable: |ΔVMAF| <= 0.14 on every rung,
+  and the delivered bitrate delta flips sign across rungs (-2.1% at 2160p, +11.4%
+  at 432p) - the signature of two rate controllers filling the buffer differently,
+  not of codec efficiency. The pipeline pins both codecs to the same `-b:v`, so
+  bitrate-at-matched-quality (the axis "H.265 saves 40%" lives on) is not
+  measurable from a ladder run and remains unmeasured here.
+- Determinism cross-checked across two independent pipeline runs (`demo.json` and
+  `m5_hevc_fallback.json`): identical VMAF means and identical delivered bitrates
+  on all five rungs; only wall time drifts (~1%).
+- `-rc constqp -cq N` is silently ignored by these NVENC builds (three different
+  N produced byte-identical files). `-rc vbr -cq N -qmin N -qmax N` is what
+  actually pins the quantizer (bitrate moves monotonically 2585 -> 128 kbps over
+  N = 20..32). Recorded here because it is the prerequisite for a BD-rate test and
+  because the wrong spelling fails silently rather than loudly.
+- Measured, not read off the spec: video and audio **cannot** share a DASH
+  AdaptationSet in ffmpeg - "Codec type of stream 1 doesn't match AdaptationSet's
+  media type" - even though the spec permits multiplexed sets. And
+  `-adaptation_sets id=0,streams=v id=1,streams=v` is rejected as
+  "Stream 0 is already assigned to an AdaptationSet"; explicit output indices are
+  the form that works.
+
+### Found while measuring, deliberately not fixed
+- **The committed `docs/figures/m1_time_bitrate.svg` was stale before this release.**
+  Regenerating it from `bench/demo.json` moved the wall-time bars (29.67 -> 29.84,
+  13.83 -> 14.01, 9.34 -> 9.30, 5.80 -> 5.86, 4.77 -> 4.49) because 1.0.5 re-measured
+  the master and re-ran the ladder but the chart was not regenerated with it. This
+  is the same class of drift 1.0.5's "Notes on method" is about, caught by the same
+  mechanism. The VMAF chart was byte-identical, which independently confirms the
+  determinism claim made for M5: VMAF and BANDWIDTH reproduce exactly across runs,
+  only wall time drifts. Fixed by regenerating, not by hand.
+- **`metrics.bitrate()` reports an inflated figure for a concatenated TS, and the
+  committed `bench/m1_h264_nvenc_chunk8.json` carries it.** `ts.py` documents that
+  ffprobe's container duration on a concatenated TS lies (each chunk restarts its
+  PCR/DTS base) and proves integrity by packet count instead - but `bitrate()`
+  falls back to `format.bit_rate`, which ffprobe derives as `size / duration`, so
+  on exactly those files it inherits the lie. Measured on the committed artifact's
+  own files: 2160p reports **266 875 kbps** against a 28 000 kbps target, ffprobe
+  duration 3.03 s for a 24 s rung, and `size / 24 s` gives **33 702 kbps** - a
+  factor of 7.9, matching the duration error exactly. Same factor on all five
+  rungs. The bug is reachable only through the chunked path; every whole-file
+  artifact (`demo.json`, `m4_cancelled_report.json`, `m5_hevc_fallback.json`) is
+  correct, and no README number comes from the affected column (the bitrate tables
+  read BANDWIDTH back out of the manifest). Not fixed here because the honest fix
+  changes what a committed artifact means, and regenerating it would silently
+  move a number the README quotes - which is the failure mode 1.0.5's "Notes on
+  method" is about. The correct fix is to pass the known media duration into
+  `bitrate()` and label the basis, then regenerate M1 in a release that says so.

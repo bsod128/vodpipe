@@ -1,0 +1,858 @@
+{
+  "job_id": "m5_hevc_fallback",
+  "meta": {
+    "ffmpeg": "ffmpeg version 7.1-essentials_build-www.gyan.dev Copyright (c) 2000-2024 the FFmpeg developers",
+    "encoder": "hevc_nvenc",
+    "preset": "p5",
+    "chunks": null,
+    "source": "3840x2160@30.0 h264+aac, 24.00 s, 217704 kbps, IDR: 8",
+    "duration": 24.0,
+    "gpu": {
+      "codec": "hevc_nvenc",
+      "cards": [
+        {
+          "index": 4,
+          "name": "NVIDIA GeForce RTX 3060",
+          "used": 2375,
+          "total": 12288,
+          "util": 22,
+          "nvenc": true,
+          "reason": "ok"
+        },
+        {
+          "index": 3,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16055,
+          "total": 16384,
+          "util": 0,
+          "nvenc": false,
+          "reason": "[hevc_nvenc @ 0000020c115f79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [hevc_nvenc @ 0000020c115f79c0] No capable device"
+        },
+        {
+          "index": 2,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16099,
+          "total": 16384,
+          "util": 24,
+          "nvenc": false,
+          "reason": "[hevc_nvenc @ 0000022e8b1b79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [hevc_nvenc @ 0000022e8b1b79c0] No capable device"
+        },
+        {
+          "index": 1,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16099,
+          "total": 16384,
+          "util": 97,
+          "nvenc": false,
+          "reason": "[hevc_nvenc @ 000001d0169079c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [hevc_nvenc @ 000001d0169079c0] No capable device"
+        },
+        {
+          "index": 0,
+          "name": "Tesla V100-SXM2-16GB",
+          "used": 16159,
+          "total": 16384,
+          "util": 70,
+          "nvenc": false,
+          "reason": "[hevc_nvenc @ 00000232027e79c0] dl_fn->cuda_dl->cuCtxCreate(&ctx->cu_context_internal, 0, cu_device) failed -> CUDA_ERROR_OUT_OF_MEMORY: out of memory [hevc_nvenc @ 00000232027e79c0] No capable device"
+        }
+      ],
+      "picked": 4
+    },
+    "watermark": null,
+    "rungs": [
+      "2160p",
+      "1440p",
+      "1080p",
+      "720p",
+      "432p"
+    ],
+    "fallback": "h264_nvenc",
+    "fallback_preset": "p5"
+  },
+  "encode": [
+    {
+      "mode": "whole",
+      "rung": "2160p",
+      "encoder": "hevc_nvenc",
+      "speed_x": 0.806,
+      "wall_s": 30.16,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_2160p_hevc_nvenc.ts",
+      "size": 90826560,
+      "rung_res": "3840x2160",
+      "target_kbps": 28000,
+      "tag": "hvc1",
+      "measured": {
+        "video_kbps": 30119,
+        "audio_kbps": 129,
+        "codec": "hevc",
+        "resolution": "3840x2160",
+        "total_kbps": 30248,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_2160p_hevc_nvenc.mp4",
+        "video_tag": "hvc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1440p",
+      "encoder": "hevc_nvenc",
+      "speed_x": 1.73,
+      "wall_s": 14.35,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_1440p_hevc_nvenc.ts",
+      "size": 35722256,
+      "rung_res": "2560x1440",
+      "target_kbps": 11000,
+      "tag": "hvc1",
+      "measured": {
+        "video_kbps": 11766,
+        "audio_kbps": 130,
+        "codec": "hevc",
+        "resolution": "2560x1440",
+        "total_kbps": 11896,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_1440p_hevc_nvenc.mp4",
+        "video_tag": "hvc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1080p",
+      "encoder": "hevc_nvenc",
+      "speed_x": 2.65,
+      "wall_s": 9.48,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_1080p_hevc_nvenc.ts",
+      "size": 21171808,
+      "rung_res": "1920x1080",
+      "target_kbps": 6500,
+      "tag": "hvc1",
+      "measured": {
+        "video_kbps": 6920,
+        "audio_kbps": 130,
+        "codec": "hevc",
+        "resolution": "1920x1080",
+        "total_kbps": 7051,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_1080p_hevc_nvenc.mp4",
+        "video_tag": "hvc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "720p",
+      "encoder": "hevc_nvenc",
+      "speed_x": 4.42,
+      "wall_s": 5.83,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_720p_hevc_nvenc.ts",
+      "size": 10989164,
+      "rung_res": "1280x720",
+      "target_kbps": 3200,
+      "tag": "hvc1",
+      "measured": {
+        "video_kbps": 3529,
+        "audio_kbps": 130,
+        "codec": "hevc",
+        "resolution": "1280x720",
+        "total_kbps": 3659,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_720p_hevc_nvenc.mp4",
+        "video_tag": "hvc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "432p",
+      "encoder": "hevc_nvenc",
+      "speed_x": 5.77,
+      "wall_s": 4.53,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_432p_hevc_nvenc.ts",
+      "size": 5093672,
+      "rung_res": "768x432",
+      "target_kbps": 1400,
+      "tag": "hvc1",
+      "measured": {
+        "video_kbps": 1565,
+        "audio_kbps": 130,
+        "codec": "hevc",
+        "resolution": "768x432",
+        "total_kbps": 1696,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_432p_hevc_nvenc.mp4",
+        "video_tag": "hvc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "2160p",
+      "encoder": "h264_nvenc",
+      "speed_x": 0.805,
+      "wall_s": 30.23,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_2160p_h264_nvenc.ts",
+      "size": 87837172,
+      "rung_res": "3840x2160",
+      "target_kbps": 28000,
+      "tag": "avc1",
+      "measured": {
+        "video_kbps": 29123,
+        "audio_kbps": 129,
+        "codec": "h264",
+        "resolution": "3840x2160",
+        "total_kbps": 29253,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_2160p_h264_nvenc.mp4",
+        "video_tag": "avc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1440p",
+      "encoder": "h264_nvenc",
+      "speed_x": 1.73,
+      "wall_s": 14.3,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_1440p_h264_nvenc.ts",
+      "size": 35117272,
+      "rung_res": "2560x1440",
+      "target_kbps": 11000,
+      "tag": "avc1",
+      "measured": {
+        "video_kbps": 11564,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "2560x1440",
+        "total_kbps": 11695,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_1440p_h264_nvenc.mp4",
+        "video_tag": "avc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "1080p",
+      "encoder": "h264_nvenc",
+      "speed_x": 2.66,
+      "wall_s": 9.49,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_1080p_h264_nvenc.ts",
+      "size": 20726248,
+      "rung_res": "1920x1080",
+      "target_kbps": 6500,
+      "tag": "avc1",
+      "measured": {
+        "video_kbps": 6772,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "1920x1080",
+        "total_kbps": 6902,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_1080p_h264_nvenc.mp4",
+        "video_tag": "avc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "720p",
+      "encoder": "h264_nvenc",
+      "speed_x": 4.36,
+      "wall_s": 5.93,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_720p_h264_nvenc.ts",
+      "size": 10949308,
+      "rung_res": "1280x720",
+      "target_kbps": 3200,
+      "tag": "avc1",
+      "measured": {
+        "video_kbps": 3515,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "1280x720",
+        "total_kbps": 3646,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_720p_h264_nvenc.mp4",
+        "video_tag": "avc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    },
+    {
+      "mode": "whole",
+      "rung": "432p",
+      "encoder": "h264_nvenc",
+      "speed_x": 5.91,
+      "wall_s": 4.42,
+      "out_fps": 30,
+      "out": "work/m5_hevc_fallback/m5_hevc_fallback_432p_h264_nvenc.ts",
+      "size": 5135972,
+      "rung_res": "768x432",
+      "target_kbps": 1400,
+      "tag": "avc1",
+      "measured": {
+        "video_kbps": 1579,
+        "audio_kbps": 130,
+        "codec": "h264",
+        "resolution": "768x432",
+        "total_kbps": 1710,
+        "bitrate_source": "container"
+      },
+      "normalize": {
+        "ok": true,
+        "vpkts_ok": true,
+        "apkts_ok": true,
+        "mp4": "work/m5_hevc_fallback/m5_hevc_fallback_432p_h264_nvenc.mp4",
+        "video_tag": "avc1",
+        "has_audio": true,
+        "before": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "after": {
+          "duration": 24.021,
+          "vpkts": 720,
+          "apkts": 1126
+        },
+        "expected_duration": 24.0
+      }
+    }
+  ],
+  "ladder_wall_s": 128.73000000000002,
+  "packaging": {
+    "hls": {
+      "kind": "hls",
+      "master": "out/m5_hevc_fallback/hls/master.m3u8",
+      "wall_s": 2.77,
+      "variants": [
+        {
+          "bandwidth": 30990160,
+          "resolution": "3840x2160",
+          "uri": "stream_2160p_hevc_nvenc.m3u8",
+          "codecs": "hvc1.1.4.L150.B01,mp4a.40.2"
+        },
+        {
+          "bandwidth": 12105462,
+          "resolution": "2560x1440",
+          "uri": "stream_1440p_hevc_nvenc.m3u8",
+          "codecs": "hvc1.1.4.L150.B01,mp4a.40.2"
+        },
+        {
+          "bandwidth": 7043380,
+          "resolution": "1920x1080",
+          "uri": "stream_1080p_hevc_nvenc.m3u8",
+          "codecs": "hvc1.1.4.L120.B01,mp4a.40.2"
+        },
+        {
+          "bandwidth": 3784674,
+          "resolution": "1280x720",
+          "uri": "stream_720p_hevc_nvenc.m3u8",
+          "codecs": "hvc1.1.4.L93.B01,mp4a.40.2"
+        },
+        {
+          "bandwidth": 1810872,
+          "resolution": "768x432",
+          "uri": "stream_432p_hevc_nvenc.m3u8",
+          "codecs": "hvc1.1.4.L90.B01,mp4a.40.2"
+        },
+        {
+          "bandwidth": 31656548,
+          "resolution": "3840x2160",
+          "uri": "stream_2160p_h264_nvenc.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 12319668,
+          "resolution": "2560x1440",
+          "uri": "stream_1440p_h264_nvenc.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 7485362,
+          "resolution": "1920x1080",
+          "uri": "stream_1080p_h264_nvenc.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 3680874,
+          "resolution": "1280x720",
+          "uri": "stream_720p_h264_nvenc.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        },
+        {
+          "bandwidth": 1625346,
+          "resolution": "768x432",
+          "uri": "stream_432p_h264_nvenc.m3u8",
+          "codecs": "avc1.640033,mp4a.40.2"
+        }
+      ],
+      "segments": 60
+    },
+    "dash": {
+      "kind": "dash",
+      "manifest": "out/m5_hevc_fallback/dash/manifest.mpd",
+      "wall_s": 2.8,
+      "representations": [
+        {
+          "media": "video",
+          "bandwidth": 29408960,
+          "width": 3840,
+          "height": 2160,
+          "codecs": "hvc1"
+        },
+        {
+          "media": "video",
+          "bandwidth": 11431706,
+          "width": 2560,
+          "height": 1440,
+          "codecs": "hvc1"
+        },
+        {
+          "media": "video",
+          "bandwidth": 6685725,
+          "width": 1920,
+          "height": 1080,
+          "codecs": "hvc1"
+        },
+        {
+          "media": "video",
+          "bandwidth": 3362781,
+          "width": 1280,
+          "height": 720,
+          "codecs": "hvc1"
+        },
+        {
+          "media": "video",
+          "bandwidth": 1439854,
+          "width": 768,
+          "height": 432,
+          "codecs": "hvc1"
+        },
+        {
+          "media": "video",
+          "bandwidth": 28433354,
+          "width": 3840,
+          "height": 2160,
+          "codecs": "avc1.640033"
+        },
+        {
+          "media": "video",
+          "bandwidth": 11235015,
+          "width": 2560,
+          "height": 1440,
+          "codecs": "avc1.640033"
+        },
+        {
+          "media": "video",
+          "bandwidth": 6539322,
+          "width": 1920,
+          "height": 1080,
+          "codecs": "avc1.640033"
+        },
+        {
+          "media": "video",
+          "bandwidth": 3349598,
+          "width": 1280,
+          "height": 720,
+          "codecs": "avc1.640033"
+        },
+        {
+          "media": "video",
+          "bandwidth": 1453095,
+          "width": 768,
+          "height": 432,
+          "codecs": "avc1.640033"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        },
+        {
+          "media": "audio",
+          "bandwidth": 128061,
+          "width": null,
+          "height": null,
+          "codecs": "mp4a.40.2"
+        }
+      ],
+      "segments": 150
+    },
+    "ladder": {
+      "variants": 10,
+      "ladder": [
+        {
+          "label": "avc1_3840x2160",
+          "resolution": "3840x2160",
+          "codecs": "avc1.640033,mp4a.40.2",
+          "total_kbps": 31656
+        },
+        {
+          "label": "hvc1_3840x2160",
+          "resolution": "3840x2160",
+          "codecs": "hvc1.1.4.L150.B01,mp4a.40.2",
+          "total_kbps": 30990
+        },
+        {
+          "label": "avc1_2560x1440",
+          "resolution": "2560x1440",
+          "codecs": "avc1.640033,mp4a.40.2",
+          "total_kbps": 12319
+        },
+        {
+          "label": "hvc1_2560x1440",
+          "resolution": "2560x1440",
+          "codecs": "hvc1.1.4.L150.B01,mp4a.40.2",
+          "total_kbps": 12105
+        },
+        {
+          "label": "avc1_1920x1080",
+          "resolution": "1920x1080",
+          "codecs": "avc1.640033,mp4a.40.2",
+          "total_kbps": 7485
+        },
+        {
+          "label": "hvc1_1920x1080",
+          "resolution": "1920x1080",
+          "codecs": "hvc1.1.4.L120.B01,mp4a.40.2",
+          "total_kbps": 7043
+        },
+        {
+          "label": "hvc1_1280x720",
+          "resolution": "1280x720",
+          "codecs": "hvc1.1.4.L93.B01,mp4a.40.2",
+          "total_kbps": 3784
+        },
+        {
+          "label": "avc1_1280x720",
+          "resolution": "1280x720",
+          "codecs": "avc1.640033,mp4a.40.2",
+          "total_kbps": 3680
+        },
+        {
+          "label": "hvc1_768x432",
+          "resolution": "768x432",
+          "codecs": "hvc1.1.4.L90.B01,mp4a.40.2",
+          "total_kbps": 1810
+        },
+        {
+          "label": "avc1_768x432",
+          "resolution": "768x432",
+          "codecs": "avc1.640033,mp4a.40.2",
+          "total_kbps": 1625
+        }
+      ],
+      "codecs": [
+        "avc1",
+        "hvc1"
+      ],
+      "top_kbps": 31656,
+      "bottom_kbps": 1625
+    }
+  },
+  "vmaf": {
+    "2160p_hevc_nvenc": {
+      "vmaf_mean": 94.76,
+      "vmaf_harmonic": 94.75,
+      "vmaf_min": 93.14,
+      "vmaf_p99": 96.59,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 53.91
+    },
+    "1440p_hevc_nvenc": {
+      "vmaf_mean": 87.22,
+      "vmaf_harmonic": 87.22,
+      "vmaf_min": 86.01,
+      "vmaf_p99": 88.24,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 55.95
+    },
+    "1080p_hevc_nvenc": {
+      "vmaf_mean": 82.2,
+      "vmaf_harmonic": 82.2,
+      "vmaf_min": 80.92,
+      "vmaf_p99": 83.32,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 55.16
+    },
+    "720p_hevc_nvenc": {
+      "vmaf_mean": 76.16,
+      "vmaf_harmonic": 76.16,
+      "vmaf_min": 74.9,
+      "vmaf_p99": 77.13,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 54.37
+    },
+    "432p_hevc_nvenc": {
+      "vmaf_mean": 59.72,
+      "vmaf_harmonic": 59.71,
+      "vmaf_min": 57.4,
+      "vmaf_p99": 60.44,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 51.21
+    },
+    "2160p_h264_nvenc": {
+      "vmaf_mean": 94.9,
+      "vmaf_harmonic": 94.89,
+      "vmaf_min": 93.37,
+      "vmaf_p99": 96.8,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 57.28
+    },
+    "1440p_h264_nvenc": {
+      "vmaf_mean": 87.14,
+      "vmaf_harmonic": 87.14,
+      "vmaf_min": 85.9,
+      "vmaf_p99": 88.5,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 55.49
+    },
+    "1080p_h264_nvenc": {
+      "vmaf_mean": 82.16,
+      "vmaf_harmonic": 82.15,
+      "vmaf_min": 80.82,
+      "vmaf_p99": 83.47,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 56.67
+    },
+    "720p_h264_nvenc": {
+      "vmaf_mean": 76.12,
+      "vmaf_harmonic": 76.12,
+      "vmaf_min": 73.57,
+      "vmaf_p99": 77.41,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 52.83
+    },
+    "432p_h264_nvenc": {
+      "vmaf_mean": 59.61,
+      "vmaf_harmonic": 59.61,
+      "vmaf_min": 57.69,
+      "vmaf_p99": 60.33,
+      "frames": 720,
+      "vmaf_basis": "pooled",
+      "wall_s": 52.02
+    }
+  },
+  "verify": [],
+  "total_wall_s": 696.73
+}

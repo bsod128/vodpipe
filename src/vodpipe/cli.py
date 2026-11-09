@@ -24,7 +24,7 @@ import sys
 import time
 
 from . import bench as bench_mod
-from . import ff, figures, gpu, probe, report, sample
+from . import encoders, ff, figures, gpu, packager, probe, report, sample
 from . import pipeline as pl
 from .encoders import BACKENDS, validate_preset
 from .ladder import select as select_rungs
@@ -95,20 +95,57 @@ def cmd_master(args: argparse.Namespace) -> int:
 # ------------------------------------------------------------------ demo
 
 
+def demo_arg_errors(args: argparse.Namespace) -> str | None:
+    """Reject a self-contradictory `demo` invocation before anything is touched.
+
+    Pure and first, because every one of these is a command that would otherwise
+    run for ten minutes and report something other than what was asked for.
+    """
+    # A fallback only means something if the codecs differ: two H.264 ladders in
+    # one manifest is not a fallback, it is a duplicate that halves the ladder.
+    # The family comes from the encoder's own fourcc, so this cannot drift from
+    # what the encoder actually writes.
+    if args.fallback and (packager.codec_family(encoders.build(args.fallback).tag)
+                          == packager.codec_family(encoders.build(args.encoder).tag)):
+        return (f"--fallback {args.fallback} is the same codec family as --encoder "
+                f"{args.encoder}; nothing to fall back to")
+    # Without this, `--encoder hevc_nvenc --fallback-preset p7` runs one ladder at
+    # the primary's preset and never says the flag did nothing.
+    if args.fallback_preset and not args.fallback:
+        return "--fallback-preset needs --fallback; there is no second ladder to preset"
+    if args.watermark and not is_safe_id(args.watermark):
+        return f"refusing watermark id {args.watermark!r}: use [A-Za-z0-9_.:@#-]"
+    return None
+
+
 def cmd_demo(args: argparse.Namespace) -> int:
-    """The one-button path: probe -> ladder -> verify -> package -> VMAF."""
+    """The one-button path: probe -> ladder -> verify -> package -> VMAF.
+
+    With `--fallback`, two ladders are encoded into ONE manifest: clients that
+    cannot decode the primary codec must still find a complete ladder, and two
+    separate packager runs would produce two masters, where a client never sees
+    the second one.
+    """
+    bad = demo_arg_errors(args)
+    if bad:
+        print(bad)
+        return 2
     sample.require_space(WORK, args.min_free_gb)
     if not os.path.exists(args.src):
         print(f"no source at {args.src}; run: vodpipe master")
         return 2
 
+    encoders_to_run = [args.encoder] + ([args.fallback] if args.fallback else [])
     gpurep = None
-    if args.encoder.endswith("nvenc"):
-        gpurep = gpu.pick(args.encoder)
-        print(gpu.summary(gpurep))
-        if gpurep["picked"] is None:
-            print("NVENC unavailable here; rerun with --encoder libx264")
+    for name in encoders_to_run:
+        if not name.endswith("nvenc"):
+            continue
+        rep = gpu.pick(name)
+        print(gpu.summary(rep))
+        if rep["picked"] is None:
+            print(f"NVENC unavailable for {name}; rerun with --encoder libx264")
             return 1
+        gpurep = gpurep or rep
 
     # strict=True: `--rungs 2160p,480p` used to drop the unknown label silently
     # and encode the rest, so the run looked fine and measured something else.
@@ -124,12 +161,11 @@ def cmd_demo(args: argparse.Namespace) -> int:
             print("  " + problem)
         return 2
 
+    # The id itself is rejected up front by `demo_arg_errors`; this only maps the
+    # flags to the filter spec the encoder receives.
     wm_spec = None
     if args.watermark:
         wm_spec = {"dynamic": args.watermark, "ghost": bool(args.ghost)}
-        if not is_safe_id(args.watermark):
-            print(f"refusing watermark id {args.watermark!r}: use [A-Za-z0-9_.:@#-]")
-            return 2
 
     # Everything is keyed by the report's basename, so one command shape writes
     # either the whole-file ladder (demo.json) or a chunked one
@@ -146,42 +182,70 @@ def cmd_demo(args: argparse.Namespace) -> int:
         done = sum(r.get("wall_s", 0) for r in results)
         print(f"    progress {i}/{n} rungs, {done:.1f}s of encode so far")
 
+    workers = args.workers or args.chunks
     # The effective preset: what the encoder actually used, not the raw argument
     # (which is None when the caller let the backend choose). Reports must state
-    # the command that was really run.
-    eff_preset = validate_preset(args.encoder, args.preset)
-    workers = args.workers or args.chunks
+    # the command that was really run. Presets are per-backend: the NVENC "p5" is
+    # a hard ffmpeg error on libx264, so each ladder resolves its own.
+    ladders_to_run = [(args.encoder, validate_preset(args.encoder, args.preset))]
+    if args.fallback:
+        ladders_to_run.append(
+            (args.fallback, validate_preset(args.fallback, args.fallback_preset)))
 
     t0 = time.perf_counter()
-    results, wall = pipe.run_ladder(encoder=args.encoder, preset=args.preset,
-                                    nchunks=args.chunks, workers=workers,
-                                    tag=stem, rungs=rungs, on_rung_done=progress)
-    print(f"ladder wall = {wall:.1f}s")
+    ladders: dict[str, list[dict]] = {}
+    wall = 0.0
+    for name, preset in ladders_to_run:
+        print(f"ladder: {name} ({preset})")
+        results, run_wall = pipe.run_ladder(encoder=name, preset=preset,
+                                           nchunks=args.chunks, workers=workers,
+                                           tag=stem, rungs=rungs, on_rung_done=progress)
+        ladders[name] = results
+        wall += run_wall
+        print(f"  {name} ladder wall = {run_wall:.1f}s")
+    print(f"ladder wall = {wall:.1f}s"
+          + (f" across {len(ladders)} codecs" if len(ladders) > 1 else ""))
 
-    verify = pipe.verify(results)
+    all_results = [r for results in ladders.values() for r in results]
+    verify = pipe.verify(all_results)
     for v in verify:
         print(f"  concat check {v['rung']}: ok={v['ok']} vpkts={v['vpkts']}"
               f"/{v['expected_frames']}")
 
-    pkg = pipe.package(results, out)
+    if args.fallback:
+        # Primary first: within a family the packager orders renditions by
+        # bandwidth, but the ladder a client reads back should list the codec it
+        # prefers first, and a mixed-codec manifest is only legal if each codec
+        # lands in its own AdaptationSet.
+        pkg = pipe.package_dual(ladders[args.encoder], ladders[args.fallback], out)
+    else:
+        pkg = pipe.package(all_results, out)
     if pkg["hls"]:
         print("packaged:", len(pkg["hls"]["variants"]), "HLS variants,",
               pkg["hls"]["segments"], "segments;",
               len(pkg["dash"]["representations"]), "DASH representations")
         print("ladder from manifest:", pkg["ladder"]["ladder"])
+        print("codecs in manifest:", pkg["ladder"]["codecs"])
 
-    vmaf = {} if args.no_vmaf else pipe.vmaf_for(results, tag=stem + "_")
+    # A dual run delivers the same resolution under two codecs, so VMAF has to be
+    # keyed by codec too - keyed by rung alone, the fallback's number would
+    # silently overwrite the primary's.
+    dual = len(ladders) > 1
+    vmaf = {} if args.no_vmaf else pipe.vmaf_for(
+        all_results, tag=stem + "_",
+        key=(lambda r: f"{r['rung']}_{r['encoder']}") if dual else None)
     total = round(time.perf_counter() - t0, 2)
 
     rep = report.build_report(
         job_id=stem,
         meta=report.job_meta(ffmpeg=ff.version(), encoder=args.encoder,
-                             preset=eff_preset, nchunks=args.chunks, workers=workers,
+                             preset=ladders_to_run[0][1], nchunks=args.chunks, workers=workers,
                              source=pipe.src.summary(), duration=pipe.src.duration,
                              gpurep=gpurep, watermark=wm_spec,
-                             rungs=[r.label for r in rungs]),
-        encode=results, ladder_wall_s=wall, packaging=pkg, vmaf=vmaf, verify=verify,
-        total_wall_s=total)
+                             rungs=[r.label for r in rungs], fallback=args.fallback,
+                             fallback_preset=ladders_to_run[1][1] if args.fallback else None),
+        encode=all_results, ladder_wall_s=wall, packaging=pkg, vmaf=vmaf,
+        verify=verify, total_wall_s=total)
     path = report.dump(os.path.join(BENCH, args.report), report.sanitize(rep, ROOT))
     print("report ->", report.to_repo_relative(path, ROOT))
     return 0
@@ -273,31 +337,47 @@ def cmd_watermark(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------- figures
 
 
+def ladder_rows(rep: dict) -> list[dict]:
+    """Join a report's encode rows to the manifest and the VMAF block.
+
+    The join key is the **rendition label**, and it has to be: a dual-codec
+    report delivers the same resolution twice, so keying by `rung_res` collapses
+    both ladders onto one bitrate, and keying VMAF by `rung` misses every entry
+    because `cmd_demo` keys a dual run by `<rung>_<encoder>`. The label is
+    recovered from the variant playlist URI, which `package_hls` derives from the
+    same label the encode rows carry, so the two sides agree by construction.
+    Single-codec artifacts are unaffected - there the label *is* the rung.
+    """
+    pkg = rep.get("packaging") or {}
+    by_label = {packager.variant_label(v.get("uri", "")): v["bandwidth"] // 1000
+                for v in (pkg.get("hls") or {}).get("variants", [])}
+    vmaf = rep.get("vmaf") or {}
+    rows = []
+    for e in rep.get("encode") or []:
+        if e.get("cancelled"):
+            continue
+        candidates = [f"{e['rung']}_{e['encoder']}", e["rung"]]
+        key = next((k for k in candidates if k in by_label or k in vmaf), candidates[-1])
+        m = vmaf.get(key) or {}
+        rows.append({
+            "rung": key,
+            "wall_s": e.get("wall_s"),
+            "total_kbps": by_label.get(key, 0),
+            "vmaf_mean": m.get("vmaf_mean", 0),
+            "vmaf_min": m.get("vmaf_min", 0),
+        })
+    return rows
+
+
 def ladder_figures(rep: dict, out_dir: str) -> list[str]:
     """Charts for one ladder report.
 
     The bitrate comes from the packaging block, not from the file size:
     BANDWIDTH in the master playlist is audio+video combined and is the number
     a CDN and a player actually see, while file size also carries container
-    overhead. `encode` rows carry the resolution, so rung -> BANDWIDTH is a
-    lookup, not a guess.
+    overhead. See `ladder_rows` for how a row is matched to its manifest entry.
     """
-    pkg = rep.get("packaging") or {}
-    by_resolution = {v["resolution"]: v["bandwidth"] // 1000
-                     for v in (pkg.get("hls") or {}).get("variants", [])}
-    vmaf = rep.get("vmaf") or {}
-    rows = []
-    for e in rep.get("encode") or []:
-        if e.get("cancelled"):
-            continue
-        m = vmaf.get(e["rung"]) or {}
-        rows.append({
-            "rung": e["rung"],
-            "wall_s": e.get("wall_s"),
-            "total_kbps": by_resolution.get(e.get("rung_res"), 0),
-            "vmaf_mean": m.get("vmaf_mean", 0),
-            "vmaf_min": m.get("vmaf_min", 0),
-        })
+    rows = ladder_rows(rep)
     if not rows:
         return []
     return [
@@ -418,6 +498,12 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--src", default=DEFAULT_SRC)
     d.add_argument("--encoder", default="h264_nvenc", choices=sorted(BACKENDS))
     d.add_argument("--preset", default=None)
+    d.add_argument("--fallback", default=None, choices=sorted(BACKENDS),
+                   help="encode a second ladder into the SAME manifest, for clients "
+                        "that cannot decode --encoder (e.g. --encoder hevc_nvenc "
+                        "--fallback h264_nvenc)")
+    d.add_argument("--fallback-preset", default=None,
+                   help="preset for --fallback (its vocabulary is per-backend)")
     d.add_argument("--rungs", default="2160p,1440p,1080p,720p,432p")
     d.add_argument("--chunks", type=int, default=1,
                    help="parallel chunks (1 = whole file; >1 only helps across GPUs)")

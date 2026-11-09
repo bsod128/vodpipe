@@ -198,6 +198,78 @@ Two things had to be understood rather than guessed:
   minutes; reporting only between phases means the client stares at one number
   the whole time. `on_rung_done` fires after every rung.
 
+### M5 - one manifest with two codecs (HEVC primary, H.264 fallback)
+
+`vodpipe demo --encoder hevc_nvenc --fallback h264_nvenc` encodes the same
+five-rung ladder twice and packages **both** ladders into one master playlist, so
+a client that cannot decode H.265 still finds a complete H.264 ladder instead of
+nothing. Both codecs in one run: 10 HLS variants, 60 segments, 20 DASH
+representations in 3 AdaptationSets (one per codec, plus audio).
+
+| Rung | target | H.264 delivered | HEVC delivered | delta | H.264 VMAF | HEVC VMAF | Δ |
+|---|---|---|---|---|---|---|---|
+| 2160p | 28 000 | 31 656 kbps | 30 990 kbps | -2.1% | 94.90 | 94.76 | -0.14 |
+| 1440p | 11 000 | 12 319 kbps | 12 105 kbps | -1.7% | 87.14 | 87.22 | +0.08 |
+| 1080p | 6 500 | 7 485 kbps | 7 043 kbps | -5.9% | 82.16 | 82.20 | +0.04 |
+| 720p | 3 200 | 3 680 kbps | 3 784 kbps | +2.8% | 76.12 | 76.16 | +0.04 |
+| 432p | 1 400 | 1 625 kbps | 1 810 kbps | +11.4% | 59.61 | 59.72 | +0.11 |
+
+Artifact: [`bench/m5_hevc_fallback.json`](bench). Ladder wall **128.7 s** for both
+codecs (64.3 s HEVC + 64.4 s H.264, each summed over five rungs); per-rung wall
+time and speed agree between the codecs to within ~1%, so HEVC is not measurably
+slower than H.264 here.
+
+What this run does **not** show is the "H.265 saves 40% at equal quality" figure,
+and the reason is structural, not a missing measurement: the pipeline commands
+every rung with an explicit `-b:v / -maxrate:v / -bufsize:v` triple, so both
+codecs are pinned to the *same* target and the rate controller forces their
+bitrates to agree. A ladder can only answer "quality at matched bitrate", and on
+that axis the two codecs are indistinguishable on this source - every ΔVMAF is
+≤ 0.14 on a 0-100 scale, i.e. three orders of magnitude below the differences the
+ladder is designed to produce (94.90 at 2160p down to 59.61 at 432p). The delivered
+bitrate delta is the two rate controllers filling the buffer differently, not
+codec efficiency: its sign is inconsistent (HEVC below at 2160p/1080p, above at
+720p/432p), which is the signature of noise, not of a win.
+
+That the ΔVMAF column is tiny and not an artefact of run-to-run variation is
+checkable: `demo.json` and this artifact measured the same `h264_nvenc` rungs in
+two independent pipeline runs, and every VMAF mean and every delivered bitrate
+reproduces **exactly** (94.90 / 31 656 kbps both times, all five rungs) - NVENC
+whole-file encoding of the same source and settings is deterministic here, only
+wall time drifts (29.8 s vs 30.2 s, ~1%). So the deltas in the table are real
+differences between the codecs, and they are simply small on the axis a ladder can
+measure.
+
+Answering the equal-quality question needs the other axis - constant-quantizer
+control, so the bitrate is free to move, with the two codecs matched on VMAF
+rather than on QP (their QP scales are not comparable; `-rc constqp -cq N` is
+measured to be ignored by these NVENC builds, and `-rc vbr -cq N -qmin N -qmax N`
+is what actually pins the quantizer). That is a proper BD-rate measurement and I
+have not run one to the standard the rest of this repo is set to, so it is stated
+here as not measured. On this ladder the reason to ship HEVC is decoder coverage
+and the fallback path, not a proven bitrate saving.
+
+Two things had to be measured rather than read off the docs:
+
+* **`-tag:v hvc1` does not survive MPEG-TS.** The pipeline encodes to TS and
+  remuxes TS → MP4, and the MP4 handler rebuilds the stream description from the
+  elementary stream, which resolves H.265 to `hev1` however the encoder was
+  commanded. Measured consequence: with `hev1`, ffmpeg writes **no `CODECS=`
+  attribute at all** for that HLS variant, so a client cannot tell the HEVC
+  rendition from the H.264 one and never selects the fallback. `encoders.hevc_nvenc()`
+  had been setting `tag="hvc1"` with a comment saying the fourcc matters for Apple
+  and Smart TV - true, but it never reached the output. The tag is now re-asserted
+  in `ts.normalize()` and read back out of the finished file (`ts.stream_tags`),
+  because it is a property of the container a client parses, not of the encoder
+  config.
+* **Video and audio cannot share an AdaptationSet.** ffmpeg rejects it with
+  "Codec type of stream 1 doesn't match AdaptationSet's media type", even though
+  the DASH spec allows multiplexed sets. Splitting a mixed-codec ladder by codec
+  family (`packager.codec_family`) gives one video set per codec plus one audio
+  set, addressed by explicit output stream index. The index matters: `map_args`
+  maps audio with `?`, so a silent rendition shifts every later output index and
+  counting `2*i` silently points at the wrong stream.
+
 ## Design
 
 **Pure core, imperative shell.** Every stage is split into a function that builds
@@ -333,7 +405,7 @@ session already saturates a card.
 ## Tests, lint, CI
 
 ```bash
-pytest -q                 # 190 tests; ffmpeg/gpu marked tests skip without hardware
+pytest -q                 # 244 tests; ffmpeg/gpu marked tests skip without hardware
 ruff check src tests
 mypy
 ```
@@ -354,8 +426,13 @@ parses at all.
 * The source is synthetic. VMAF absolutes belong to it; ratios and the
   encoder/parallelism conclusions transfer, absolute quality numbers do not.
 * Watermarking is session identification, not forensic marking.
-* `hevc_nvenc` and `h264_qsv` are wired and verified to exist; only the h264 path
-  was benchmarked end to end.
+* `hevc_nvenc` is benchmarked end to end and ships as a fallback ladder (M5), on
+  the same 24 s synthetic master as everything else. `h264_qsv` is wired and
+  verified to exist only - this machine has no Intel iGPU, so it has never
+  produced a frame here.
+* The HEVC/H.264 comparison is bitrate-at-matched-target (what the pipeline's
+  rate control permits), not bitrate-at-matched-quality. The "H.265 saves 40%"
+  figure is therefore neither confirmed nor refuted by this repo - see M5.
 * No content-protection stack (no DRM, no AES-128 sample-AES in the manifests).
 * The queue is proven on one host with one worker. No autoscaling, no sharding.
 

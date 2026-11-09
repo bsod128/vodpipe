@@ -75,41 +75,73 @@ def verify_concat(path: str, expect_frames: int, runner: ff.Runner | None = None
             "duration": stats["duration"]}
 
 
-def normalize_args(ts_path: str, mp4_path: str) -> list[str]:
-    return [
+def normalize_args(ts_path: str, mp4_path: str, tag: str = "") -> list[str]:
+    args = [
         ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "warning",
         # +genpts rebuilds missing PTS, which the seam gaps can leave behind.
         "-fflags", "+genpts", "-i", ff.clean_path(ts_path),
         "-c", "copy",
         # AAC inside TS is ADTS; fMP4/MP4 requires AudioSpecificConfig.
         "-bsf:a", "aac_adtstoasc",
-        "-movflags", "+faststart",
-        mp4_path,
     ]
+    # The MP4 handler rewrites the stream description from what the elementary
+    # stream says, and for H.265 in MPEG-TS that resolves to `hev1` - the
+    # encoder's own `-tag:v hvc1` does not survive the container hop. Measured
+    # on ffmpeg 7.1: without a tag here, an HEVC rendition is packaged with
+    # `codecs="hev1"` in DASH and with **no CODECS= at all** in the HLS master,
+    # so a client cannot tell HEVC from H.264 and cannot pick a fallback. The
+    # fourcc has to be asserted where the MP4 is written.
+    if tag:
+        args += ["-tag:v", tag]
+    args += ["-movflags", "+faststart", mp4_path]
+    return args
+
+
+def stream_tags(path: str, runner: ff.Runner | None = None) -> tuple[str, bool]:
+    """Video fourcc and whether the file has an audio stream.
+
+    One ffprobe call, because packaging needs both: the fourcc decides which
+    AdaptationSet a rendition belongs to, and audio presence decides the output
+    stream index (`-map N:a:0?` skips a silent rendition, shifting every later
+    index). Both are facts about this file, so both are read from it.
+    """
+    streams = ff.probe_json(path, ["stream=codec_type,codec_tag_string"],
+                            runner=runner).get("streams", [])
+    video = next((s.get("codec_tag_string", "") for s in streams
+                  if s.get("codec_type") == "video"), "")
+    has_audio = any(s.get("codec_type") == "audio" for s in streams)
+    return video, has_audio
 
 
 def normalize(ts_path: str, mp4_path: str, expect_dur: float = 0.0,
-              runner: ff.Runner | None = None) -> dict:
+              runner: ff.Runner | None = None, tag: str = "") -> dict:
     """Remux TS -> MP4 and prove nothing was lost.
 
     The check is packet-for-packet: `vpkts`/`apkts` before must equal after.
     Duration is only compared for the resulting MP4 (the TS number is the lying
-    one), against the source duration.
+    one), against the source duration. `tag` re-asserts the video fourcc, which
+    MPEG-TS cannot carry - see `normalize_args`.
     """
     os.makedirs(os.path.dirname(mp4_path) or ".", exist_ok=True)
     run = runner or ff.Runner()
-    run.run(normalize_args(ts_path, mp4_path))
+    run.run(normalize_args(ts_path, mp4_path, tag))
     before = packet_stats(ts_path, runner=run)
     after = packet_stats(mp4_path, runner=run)
 
     ok = before["vpkts"] == after["vpkts"] and before["apkts"] == after["apkts"]
     if expect_dur:
         ok = ok and abs(after["duration"] - expect_dur) <= _PACKET_CHECK
+    fourcc, has_audio = stream_tags(mp4_path, runner=run)
     return {
         "ok": ok,
         "vpkts_ok": before["vpkts"] == after["vpkts"],
         "apkts_ok": before["apkts"] == after["apkts"],
         "mp4": mp4_path,
+        # What the manifest will advertise, read back from this file: the fourcc
+        # decides DASH AdaptationSet grouping and whether HLS may state CODECS=,
+        # and audio presence decides the rendition's output stream index.
+        "video_tag": fourcc,
+        "has_audio": has_audio,
         "before": before,
         "after": after,
         "expected_duration": expect_dur,

@@ -66,24 +66,48 @@ def safe_label(label: str) -> str:
     return cleaned[:48] or "v"
 
 
-def var_stream_map(rungs: list[tuple[str, str]]) -> str:
-    """One `v:N,a:N,name:label` per rendition, **space separated**.
+def var_stream_map(rungs: list[tuple[str, str]], audio: list[bool] | None = None) -> str:
+    """One `v:N,a:M,name:label` per rendition, **space separated**.
 
     This string is the single most common packaging failure I hit: writing the
     separator as `;` (or as a comma between variants) produces a cryptic
     "Could not write header".
+
+    The two numbers are **not** the same counter, which is what a silent ladder
+    makes visible. `v:N` is the Nth video stream and `a:M` is the Mth *audio*
+    stream (measured: `parse_variant_stream_mapstring` resolves each selector
+    against its own codec type, not against the output stream index that
+    `-adaptation_sets` uses). So when one rendition has no audio, every audio
+    ordinal after it shifts down, and repeating the rendition index asks for an
+    audio stream that does not exist:
+
+        [silent, audio, audio] with `v:2,a:2` -> "Unable to map stream at a:2"
+                                                -> "Could not write header"
+
+    A rendition with no audio therefore gets no `a:` part at all and is packaged
+    video-only. With audio on every rendition this emits exactly the classic
+    `v:0,a:0 v:1,a:1 ...` form.
     """
-    return " ".join(f"v:{i},a:{i},name:{safe_label(label)}"
-                    for i, (label, _) in enumerate(rungs))
+    audio = audio if audio is not None else [True] * len(rungs)
+    parts = []
+    ordinal = 0
+    for i, (label, _) in enumerate(rungs):
+        sel = f"v:{i}"
+        if audio[i]:
+            sel += f",a:{ordinal}"
+            ordinal += 1
+        parts.append(f"{sel},name:{safe_label(label)}")
+    return " ".join(parts)
 
 
-def hls_args(rungs: list[tuple[str, str]], hls_dir: str, seg_dur: float = 4.0) -> list[str]:
+def hls_args(rungs: list[tuple[str, str]], hls_dir: str, seg_dur: float = 4.0,
+             audio: list[bool] | None = None) -> list[str]:
     args = [ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "error"]
     args += input_args(rungs) + map_args(len(rungs))
     args += [
         "-c", "copy",
         *bsf_args(rungs),
-        "-var_stream_map", var_stream_map(rungs),
+        "-var_stream_map", var_stream_map(rungs, audio),
         "-f", "hls",
         "-hls_time", str(seg_dur),
         "-hls_segment_type", "fmp4",
@@ -98,7 +122,93 @@ def hls_args(rungs: list[tuple[str, str]], hls_dir: str, seg_dur: float = 4.0) -
     return args
 
 
-def dash_args(rungs: list[tuple[str, str]], dash_dir: str, seg_dur: float = 4.0) -> list[str]:
+#: MP4 video fourcc -> codec family. Two fourcc spellings (`hvc1`, `hev1`) mean
+#: one family, so grouping must be by family: an AdaptationSet that mixes `avc1`
+#: with `hvc1` is invalid, one that mixes `hvc1` with `hev1` is not.
+_FAMILY = {"avc1": "avc", "avc3": "avc", "hvc1": "hevc", "hev1": "hevc",
+           "hev2": "hevc", "h265": "hevc", "dvh1": "hevc", "dvhe": "hevc",
+           "av01": "av1"}
+
+
+def codec_family(fourcc: str) -> str:
+    """Codec family of an MP4 video fourcc (`avc1.640033` -> `avc`).
+
+    Unknown tags fall back to the tag itself, which keeps them in their own
+    AdaptationSet instead of silently merging them into an AVLC set.
+    """
+    return _FAMILY.get((fourcc or "").split(".")[0].lower(),
+                       (fourcc or "unknown").lower())
+
+
+def output_stream_index(i: int, audio: list[bool]) -> tuple[int, int | None]:
+    """Output index of the video (and audio) stream mapped from input `i`.
+
+    `-adaptation_sets` selects by **output** stream index, and those numbers are
+    assigned in `-map` order. When a rendition has no audio, `map_args` maps it
+    with the `?` suffix, ffmpeg skips it, and every later index shifts down by
+    one. Counting `2*i` therefore points at the wrong stream the moment one
+    rendition is silent, which is why the audio presence has to be an input to
+    this calculation rather than an assumption inside it.
+    """
+    index = 0
+    for j in range(i):
+        index += 2 if audio[j] else 1
+    return index, (index + 1) if audio[i] else None
+
+
+def group_by_family(families: list[str]) -> list[tuple[str, list[int]]]:
+    """Rung indices sharing a codec family, in the order first seen.
+
+    The DASH muxer puts every `streams=v` rendition into ONE AdaptationSet, and
+    an AdaptationSet carries a single `codecs=` attribute - so an H.264 and an
+    HEVC rendition in the same set is a manifest a client cannot use. Splitting
+    by family is what makes a mixed-codec ladder legal DASH.
+
+    A family, not a codec string: `avc1.640033` and `avc1.640015` are the same
+    family and belong in one set, while grouping by the full string would split
+    them by level.
+    """
+    order: dict[str, list[int]] = {}
+    for i, family in enumerate(families):
+        order.setdefault(family or "unknown", []).append(i)
+    return list(order.items())
+
+
+def dash_adaptation_sets(rungs: list[tuple[str, str]], families: list[str] | None,
+                         audio: list[bool] | None = None) -> str:
+    """The `-adaptation_sets` value for this ladder.
+
+    With one codec family (or no family information) this is the two-set shape
+    every committed artifact has, written with the `streams=v`/`streams=a`
+    shorthand. With several families each gets its own **video** set, addressed by
+    explicit output stream index, plus one audio set.
+
+    Audio cannot ride along in its video's AdaptationSet: the muxer rejects it
+    with "Codec type of stream 1 doesn't match AdaptationSet's media type"
+    (measured, not inferred from the spec, which allows multiplexed sets).
+    """
+    audio = audio if audio is not None else [True] * len(rungs)
+    if not families or len(group_by_family(families)) == 1:
+        return "id=0,streams=v id=1,streams=a"
+
+    sets: list[str] = []
+    audio_streams: list[int] = []
+    for _, indices in group_by_family(families):
+        video = []
+        for i in indices:
+            v, a = output_stream_index(i, audio)
+            video.append(v)
+            if a is not None:
+                audio_streams.append(a)
+        sets.append("id=" + str(len(sets)) + ",streams=" + ",".join(map(str, video)))
+    if audio_streams:
+        sets.append("id=" + str(len(sets)) + ",streams=" + ",".join(map(str, audio_streams)))
+    return " ".join(sets)
+
+
+def dash_args(rungs: list[tuple[str, str]], dash_dir: str, seg_dur: float = 4.0,
+              families: list[str] | None = None,
+              audio: list[bool] | None = None) -> list[str]:
     args = [ff.ffmpeg(), "-y", "-hide_banner", "-loglevel", "error"]
     args += input_args(rungs) + map_args(len(rungs))
     args += [
@@ -114,7 +224,7 @@ def dash_args(rungs: list[tuple[str, str]], dash_dir: str, seg_dur: float = 4.0)
         # of a literal list of URLs, which keeps the MPD small and cache friendly.
         "-use_template", "1",
         "-use_timeline", "1",
-        "-adaptation_sets", "id=0,streams=v id=1,streams=a",
+        "-adaptation_sets", dash_adaptation_sets(rungs, families, audio),
         ff.clean_path(os.path.join(dash_dir, "manifest.mpd")),
     ]
     return args
@@ -126,7 +236,8 @@ def dash_args(rungs: list[tuple[str, str]], dash_dir: str, seg_dur: float = 4.0)
 
 
 def package_hls(rungs: list[tuple[str, str]], out_dir: str, seg_dur: float = 4.0,
-                runner: ff.Runner | None = None) -> dict:
+                runner: ff.Runner | None = None,
+                audio: list[bool] | None = None) -> dict:
     hls_dir = os.path.join(out_dir, "hls")
     # The HLS muxer creates variant playlists but not these subdirectories; a
     # missing dir surfaces as a header write error on the very first segment.
@@ -134,7 +245,7 @@ def package_hls(rungs: list[tuple[str, str]], out_dir: str, seg_dur: float = 4.0
     for label, _ in rungs:
         os.makedirs(os.path.join(hls_dir, f"stream_{safe_label(label)}"), exist_ok=True)
 
-    res = (runner or ff.Runner()).run(hls_args(rungs, hls_dir, seg_dur))
+    res = (runner or ff.Runner()).run(hls_args(rungs, hls_dir, seg_dur, audio=audio))
     master = os.path.join(hls_dir, "master.m3u8")
     return {
         "kind": "hls", "master": master, "wall_s": round(res.wall_s, 2),
@@ -144,10 +255,12 @@ def package_hls(rungs: list[tuple[str, str]], out_dir: str, seg_dur: float = 4.0
 
 
 def package_dash(rungs: list[tuple[str, str]], out_dir: str, seg_dur: float = 4.0,
-                 runner: ff.Runner | None = None) -> dict:
+                 runner: ff.Runner | None = None, families: list[str] | None = None,
+                 audio: list[bool] | None = None) -> dict:
     dash_dir = os.path.join(out_dir, "dash")
     os.makedirs(dash_dir, exist_ok=True)
-    res = (runner or ff.Runner()).run(dash_args(rungs, dash_dir, seg_dur))
+    res = (runner or ff.Runner()).run(
+        dash_args(rungs, dash_dir, seg_dur, families=families, audio=audio))
     mpd = os.path.join(dash_dir, "manifest.mpd")
     return {
         "kind": "dash", "manifest": mpd, "wall_s": round(res.wall_s, 2),
@@ -174,6 +287,23 @@ def attr(attribute_list: str, name: str) -> str | None:
     if not m:
         return None
     return m.group(1).strip().strip('"')
+
+
+def variant_label(uri: str) -> str:
+    """The rendition label a variant playlist URI was written from.
+
+    `package_hls` names every variant `stream_<safe_label(label)>.m3u8`, so this
+    is the inverse of that naming and belongs next to it. The label is the only
+    key that identifies a rendition across the whole report: resolution does not,
+    because a mixed-codec ladder delivers 1080p twice, and a dual run names its
+    labels ``<rung>_<encoder>``.
+    """
+    name = os.path.basename(uri or "").replace(os.sep, "/").rsplit("/", 1)[-1]
+    if name.startswith("stream_"):
+        name = name[len("stream_"):]
+    if name.endswith(".m3u8"):
+        name = name[: -len(".m3u8")]
+    return name
 
 
 def parse_hls_variants(master_text: str) -> list[dict]:
@@ -218,13 +348,25 @@ def parse_dash_representations(mpd_text: str) -> list[dict]:
             ct = re.search(r'\bcontenttype="([^"]+)"', open_tag.group(0), re.I)
             content_type = ct.group(1) if ct else None
         media = content_type.split("/")[0].lower() if content_type else "unknown"
+        set_codecs = None
+        if open_tag:
+            sc = re.search(r'\bcodecs="([^"]+)"', open_tag.group(0), re.I)
+            set_codecs = sc.group(1) if sc else None
         for rep in _REP_RE.finditer(group.group(1)):
             tag = rep.group(0)
+            codecs = re.search(r'\bcodecs="([^"]+)"', tag, re.I)
             reps.append({
                 "media": media,
                 "bandwidth": _int_attr(tag, "bandwidth"),
                 "width": _int_attr(tag, "width"),
                 "height": _int_attr(tag, "height"),
+                # Without this a mixed-codec ladder is indistinguishable from a
+                # single-codec one when read back: same resolutions, same
+                # segment count. It is also the only place DASH states which
+                # codec a client would get from this Representation. ffmpeg
+                # writes it per Representation; the spec also allows it on the
+                # AdaptationSet, so that is the fallback.
+                "codecs": (codecs.group(1) if codecs else set_codecs),
             })
     return reps
 
@@ -234,12 +376,30 @@ def _int_attr(tag: str, name: str) -> int | None:
     return int(m.group(1)) if m else None
 
 
+def codec_of(codecs: str | None) -> str:
+    """Primary codec tag from a CODECS value ("avc1.640033,mp4a.40.2" -> "avc1").
+
+    Returns "unknown" rather than raising: a manifest row is a fact about what
+    was delivered, and a missing attribute must not take the whole report down.
+    """
+    first = (codecs or "").split(",")[0].strip()
+    return first.split(".")[0] or "unknown"
+
+
 def ladder_from_hls(master_text: str) -> list[dict]:
     """The ladder as the client sees it: BANDWIDTH is audio+video combined, which
-    is why it reads higher than the encoder's `-b:v` target."""
-    variants = [{"resolution": v["resolution"], "total_kbps": v["bandwidth"] // 1000}
-                for v in parse_hls_variants(master_text)]
-    return sorted(variants, key=lambda d: -d["total_kbps"])
+    is why it reads higher than the encoder's `-b:v` target.
+
+    ``label`` is ``<codec>_<resolution>``. A mixed-codec ladder can deliver the
+    same resolution twice (720p HEVC plus 720p H.264 is exactly the fallback
+    pair), so a ladder keyed by resolution alone would silently drop a rung.
+    """
+    rows = [{"label": f"{codec_of(v['codecs'])}_{v['resolution']}",
+             "resolution": v["resolution"],
+             "codecs": v["codecs"],
+             "total_kbps": v["bandwidth"] // 1000}
+            for v in parse_hls_variants(master_text)]
+    return sorted(rows, key=lambda d: -d["total_kbps"])
 
 
 def manifest_stats(out_dir: str) -> dict:
@@ -247,6 +407,7 @@ def manifest_stats(out_dir: str) -> dict:
     return {
         "variants": len(ladder),
         "ladder": ladder,
+        "codecs": sorted({r["label"].split("_", 1)[0] for r in ladder}),
         "top_kbps": ladder[0]["total_kbps"] if ladder else 0,
         "bottom_kbps": ladder[-1]["total_kbps"] if ladder else 0,
     }
